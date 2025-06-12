@@ -733,13 +733,21 @@ async function confirmarVenta() {
     mostrarAlerta("❌ E
 
 // Función para mostrar historial
-function mostrarHistorial() {
-  const ano = document.getElementById("filtroAno").value ? parseInt(document.getElementById("filtroAno").value) : null;
-  const mes = document.getElementById("filtroMes").value ? parseInt(document.getElementById("filtroMes").value) : null;
-  const dia = document.getElementById("filtroDia").value ? parseInt(document.getElementById("filtroDia").value) : null;
+// Función para mostrar historial desde Supabase
+async function mostrarHistorial() {
+  const ano = parseInt(document.getElementById("filtroAno").value) || null;
+  const mes = parseInt(document.getElementById("filtroMes").value) || null;
+  const dia = parseInt(document.getElementById("filtroDia").value) || null;
   const contenedor = document.getElementById("listaHistorial");
 
-  const ventasFiltradas = historialVentas.filter(v => {
+  const { data: ventas, error } = await supabase.from("ventas").select("*");
+
+  if (error || !ventas) {
+    contenedor.innerHTML = "<p>❌ Error al cargar ventas desde Supabase.</p>";
+    return;
+  }
+
+  const ventasFiltradas = ventas.filter(v => {
     const fecha = new Date(v.fecha);
     return (!ano || fecha.getFullYear() === ano) &&
            (!mes || (fecha.getMonth() + 1) === mes) &&
@@ -750,19 +758,19 @@ function mostrarHistorial() {
     contenedor.innerHTML = "<p>No hay ventas registradas para los filtros seleccionados.</p>";
     return;
   }
-  
+
   let totalVentas = 0;
   let totalGanancias = 0;
   let totalVentasEfectivo = 0;
   let totalVentasTarjeta = 0;
   let totalVentasTransferencia = 0;
-  
+
   let html = `<table>
                 <thead>
                   <tr>
                     <th>Fecha</th>
                     <th>Código</th>
-                    <th>Nombre</th>
+                    <th>Descripción</th>
                     <th>Categoría</th>
                     <th>Precio</th>
                     <th>Ganancia</th>
@@ -771,75 +779,55 @@ function mostrarHistorial() {
                   </tr>
                 </thead>
                 <tbody>`;
-  
-  ventasFiltradas.forEach((venta, index) => {
-    const fecha = new Date(venta.fecha);
-    const ganancia = venta.precio - (venta.costo || 0);
-    totalVentas += venta.precio;
+
+  ventasFiltradas.forEach(v => {
+    const fecha = new Date(v.fecha);
+    const ganancia = v.precio_venta - (v.costo || 0);
+    totalVentas += v.precio_venta;
     totalGanancias += ganancia;
-    
-    // Contar por forma de pago
-    if (venta.pago === "Efectivo") totalVentasEfectivo += venta.precio;
-    else if (venta.pago === "Tarjeta") totalVentasTarjeta += venta.precio;
-    else if (venta.pago === "Transferencia") totalVentasTransferencia += venta.precio;
-    
+
+    if (v.forma_pago === "Efectivo") totalVentasEfectivo += v.precio_venta;
+    else if (v.forma_pago === "Tarjeta") totalVentasTarjeta += v.precio_venta;
+    else if (v.forma_pago === "Transferencia") totalVentasTransferencia += v.precio_venta;
+
     html += `<tr>
               <td>${fecha.toLocaleString()}</td>
-              <td>${venta.codigo}</td>
-              <td>${venta.nombre}</td>
-              <td>${venta.categoria}</td>
-              <td>$${venta.precio.toFixed(2)}</td>
+              <td>${v.codigo}</td>
+              <td>${v.descripcion}</td>
+              <td>${v.categoria}</td>
+              <td>$${v.precio_venta.toFixed(2)}</td>
               <td>$${ganancia.toFixed(2)}</td>
-              <td>${venta.pago}</td>
-              <td><button onclick="eliminarVenta(${historialVentas.indexOf(venta)})" class="danger">Eliminar</button></td>
+              <td>${v.forma_pago}</td>
+              <td><button onclick="eliminarVenta('${v.id}')" class="danger">Eliminar</button></td>
             </tr>`;
   });
-  
+
   html += `</tbody></table>`;
-  
-  // Resumen de ventas
+
   html += `<div class="summary-card">
             <h3>Resumen de Ventas</h3>
-            <div class="summary-item">
-              <span>Total Ventas:</span>
-              <strong>$${totalVentas.toFixed(2)}</strong>
-            </div>
-            <div class="summary-item">
-              <span>Total Ganancias:</span>
-              <strong>$${totalGanancias.toFixed(2)}</strong>
-            </div>
-            <div class="summary-item">
-              <span>Cantidad de Ventas:</span>
-              <strong>${ventasFiltradas.length}</strong>
-            </div>
-            <div class="summary-item">
-              <span>Ventas en Efectivo:</span>
-              <strong>$${totalVentasEfectivo.toFixed(2)}</strong>
-            </div>
-            <div class="summary-item">
-              <span>Ventas con Tarjeta:</span>
-              <strong>$${totalVentasTarjeta.toFixed(2)}</strong>
-            </div>
-            <div class="summary-item">
-              <span>Ventas por Transferencia:</span>
-              <strong>$${totalVentasTransferencia.toFixed(2)}</strong>
-            </div>
+            <div class="summary-item"><span>Total Ventas:</span><strong>$${totalVentas.toFixed(2)}</strong></div>
+            <div class="summary-item"><span>Total Ganancias:</span><strong>$${totalGanancias.toFixed(2)}</strong></div>
+            <div class="summary-item"><span>Cantidad de Ventas:</span><strong>${ventasFiltradas.length}</strong></div>
+            <div class="summary-item"><span>Ventas en Efectivo:</span><strong>$${totalVentasEfectivo.toFixed(2)}</strong></div>
+            <div class="summary-item"><span>Ventas con Tarjeta:</span><strong>$${totalVentasTarjeta.toFixed(2)}</strong></div>
+            <div class="summary-item"><span>Ventas por Transferencia:</span><strong>$${totalVentasTransferencia.toFixed(2)}</strong></div>
           </div>`;
-  
+
   contenedor.innerHTML = html;
 }
 
-// Función para eliminar venta del historial
-function eliminarVenta(index) {
-  if (confirm("¿Está seguro que desea eliminar esta venta del historial?")) {
-    const ventaEliminada = historialVentas.splice(index, 1)[0];
-    localStorage.setItem("historialVentas", JSON.stringify(historialVentas));
+// Función para eliminar venta desde Supabase
+async function eliminarVenta(id) {
+  if (!confirm("¿Está seguro que desea eliminar esta venta del historial?")) return;
+
+  const { error } = await supabase.from("ventas").delete().eq("id", id);
+
+  if (error) {
+    mostrarAlerta("❌ Error al eliminar la venta: " + error.message, "danger");
+  } else {
+    mostrarAlerta("✅ Venta eliminada correctamente", "success");
     mostrarHistorial();
-    
-    mostrarAlerta(
-      `Venta eliminada del historial: ${ventaEliminada.nombre} por $${ventaEliminada.precio.toFixed(2)}`,
-      "danger"
-    );
   }
 }
 
