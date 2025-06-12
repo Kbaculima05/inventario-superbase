@@ -4,15 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sistema de Inventario y Ventas</title>
-  
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  const supabase = supabase.createClient(
-    'https://fyhfrxxpvuebrrzmyahe.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5aGZyeHhwdnVlYnJyem15YWhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk2ODAwNzIsImV4cCI6MjA2NTI1NjA3Mn0.1uMOueVkRrLuz6PJY_M_blsEq83XoU88EdKOKW8Jsm8'
-  );
-</script>
-
   <style>
     :root {
       --primary-color: #3498db;
@@ -308,6 +299,20 @@
       border: 1px solid #f5c6cb;
     }
     
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
     @media (max-width: 768px) {
       .tabs {
         flex-direction: column;
@@ -384,7 +389,7 @@
       <input type="number" id="cantidad" min="1" value="1" placeholder="Cantidad en stock">
     </div>
     
-    <button onclick="agregarProducto()" class="success">Agregar Producto</button>
+    <button onclick="agregarProducto()" class="success" id="btnAgregar">Agregar Producto</button>
   </div>
 
   <div id="inventario" class="tab-content">
@@ -452,70 +457,42 @@
   </div>
 </main>
 
+<!-- Scripts al final del body para asegurar carga correcta -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // Variables globales
-let productos = JSON.parse(localStorage.getItem("productos")) || [];
+let supabase;
+let subscription;
 
-
-// Función para agregar producto
-async function agregarProducto() {
-  const codigo = document.getElementById("codigo").value.trim();
-  const nombre = document.getElementById("nombre").value.trim();
-  const categoria = document.getElementById("categoria").value.trim();
-  const descripcion = document.getElementById("descripcion").value.trim();
-  const talla = document.getElementById("talla").value.trim();
-  const costo = parseFloat(document.getElementById("costo").value);
-  const precioVenta = parseFloat(document.getElementById("precioVenta").value);
-  const cantidad = parseInt(document.getElementById("cantidad").value);
-  const fecha = new Date().toISOString().split("T")[0];
-
-  // Validaciones
-  if (!codigo || !nombre || !categoria || isNaN(costo) || isNaN(precioVenta) || isNaN(cantidad)) {
-    mostrarAlerta("Por favor complete todos los campos obligatorios", "danger");
-    return;
+// Función para inicializar Supabase
+function inicializarSupabase() {
+  try {
+    supabase = supabase.createClient(
+      'https://fyhfrxxpvuebrrzmyahe.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5aGZyeHhwdnVlYnJyem15YWhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk2ODAwNzIsImV4cCI6MjA2NTI1NjA3Mn0.1uMOueVkRrLuz6PJY_M_blsEq83XoU88EdKOKW8Jsm8'
+    );
+    
+    // Configurar suscripción a cambios en tiempo real
+    subscription = supabase
+      .channel('cambios-inventario')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'productos' },
+        () => {
+          if (document.getElementById('inventario').classList.contains('active')) {
+            cargarInventario();
+          }
+        }
+      )
+      .subscribe();
+    
+    console.log("Supabase inicializado correctamente");
+    return true;
+  } catch (error) {
+    console.error("Error al inicializar Supabase:", error);
+    return false;
   }
-
-  if (costo <= 0 || precioVenta <= 0 || cantidad <= 0) {
-    mostrarAlerta("Los valores de costo, precio y cantidad deben ser mayores a cero", "danger");
-    return;
-  }
-
-  if (precioVenta < costo) {
-    if (!confirm("El precio de venta es menor que el costo. ¿Desea continuar?")) {
-      return;
-    }
-  }
-
-  const { error } = await supabase.from("productos").insert([{
-    codigo,
-    descripcion: nombre + " - " + descripcion,
-    categoria,
-    talla,
-    costo,
-    cantidad,
-    fecha_ingreso: fecha
-  }]);
-
-  if (error) {
-    mostrarAlerta("❌ Error al guardar en Supabase: " + error.message, "danger");
-    return;
-  }
-
-  mostrarAlerta("✅ Producto guardado correctamente en Supabase", "success");
-
-  // Limpiar formulario
-  document.getElementById('codigo').value = '';
-  document.getElementById('nombre').value = '';
-  document.getElementById('categoria').value = '';
-  document.getElementById('descripcion').value = '';
-  document.getElementById('talla').value = '';
-  document.getElementById('costo').value = '';
-  document.getElementById('precioVenta').value = '';
-  document.getElementById('cantidad').value = '1';
-
-  cargarInventario();
 }
-
 
 // Función para mostrar alertas
 function mostrarAlerta(mensaje, tipo) {
@@ -531,350 +508,538 @@ function mostrarAlerta(mensaje, tipo) {
   }, 5000);
 }
 
-// Función para cargar el inventario categorizado
+// Función para agregar producto
+async function agregarProducto() {
+  const btnAgregar = document.getElementById('btnAgregar');
+  const btnOriginalText = btnAgregar.textContent;
+  btnAgregar.innerHTML = '<span class="loading"></span> Guardando...';
+  btnAgregar.disabled = true;
 
-async function cargarInventario() {
-  const { data: productos, error } = await supabase
-    .from("productos")
-    .select("*")
-    .order("categoria", { ascending: true });
-
-  const contenedor = document.getElementById("inventarioContenido");
-
-  if (error || !productos || productos.length === 0) {
-    contenedor.innerHTML = "<p>No hay productos cargados desde Supabase.</p>";
+  // Verificar que Supabase esté inicializado
+  if (!supabase) {
+    mostrarAlerta("Error: La conexión con la base de datos no está lista", "danger");
+    btnAgregar.textContent = btnOriginalText;
+    btnAgregar.disabled = false;
     return;
   }
 
-  productos.sort((a, b) => a.categoria.localeCompare(b.categoria));
+  const codigo = document.getElementById("codigo").value.trim();
+  const nombre = document.getElementById("nombre").value.trim();
+  const categoria = document.getElementById("categoria").value.trim();
+  const descripcion = document.getElementById("descripcion").value.trim();
+  const talla = document.getElementById("talla").value.trim();
+  const costo = parseFloat(document.getElementById("costo").value);
+  const precioVenta = parseFloat(document.getElementById("precioVenta").value);
+  const cantidad = parseInt(document.getElementById("cantidad").value);
+  const fecha = new Date().toISOString().split("T")[0];
 
-  let html = '';
-  let categoriaActual = '';
+  // Validaciones
+  if (!codigo || !nombre || !categoria || isNaN(costo) || isNaN(precioVenta) || isNaN(cantidad)) {
+    mostrarAlerta("Por favor complete todos los campos obligatorios", "danger");
+    btnAgregar.textContent = btnOriginalText;
+    btnAgregar.disabled = false;
+    return;
+  }
 
-  productos.forEach((producto, index) => {
-    if (producto.categoria !== categoriaActual) {
-      categoriaActual = producto.categoria;
-      html += `<div class="categoria-header">${categoriaActual}</div>`;
-      html += `<table>
-                <thead>
-                  <tr>
-                    <th>Código</th>
-                    <th>Descripción</th>
-                    <th>Talla</th>
-                    <th>Costo</th>
-                    <th>Stock</th>
-                  </tr>
-                </thead>
-                <tbody>`;
+  if (costo <= 0 || precioVenta <= 0 || cantidad <= 0) {
+    mostrarAlerta("Los valores de costo, precio y cantidad deben ser mayores a cero", "danger");
+    btnAgregar.textContent = btnOriginalText;
+    btnAgregar.disabled = false;
+    return;
+  }
+
+  if (precioVenta < costo) {
+    if (!confirm("El precio de venta es menor que el costo. ¿Desea continuar?")) {
+      btnAgregar.textContent = btnOriginalText;
+      btnAgregar.disabled = false;
+      return;
     }
+  }
 
-    const claseCantidad = producto.cantidad <= 5 ? 'cantidad-bajo' : 'cantidad-normal';
-    const textoCantidad = producto.cantidad <= 5 ? `${producto.cantidad} (BAJO)` : producto.cantidad;
+  try {
+    const { error } = await supabase.from("productos").insert([{
+      codigo,
+      nombre,
+      descripcion,
+      categoria,
+      talla,
+      costo,
+      precio_venta: precioVenta,
+      cantidad,
+      fecha_ingreso: fecha
+    }]);
 
-    html += `<tr class="producto-row">
-              <td>${producto.codigo}</td>
-              <td>${producto.descripcion}</td>
-              <td>${producto.talla}</td>
-              <td>$${producto.costo.toFixed(2)}</td>
-              <td class="${claseCantidad}">${textoCantidad}</td>
-            </tr>`;
+    if (error) throw error;
 
-    const siguienteProducto = productos[index + 1];
-    if (!siguienteProducto || siguienteProducto.categoria !== categoriaActual) {
-      html += `</tbody></table>`;
-    }
-  });
+    mostrarAlerta("✅ Producto guardado correctamente", "success");
 
-  contenedor.innerHTML = html;
+    // Limpiar formulario
+    document.getElementById('codigo').value = '';
+    document.getElementById('nombre').value = '';
+    document.getElementById('categoria').value = '';
+    document.getElementById('descripcion').value = '';
+    document.getElementById('talla').value = '';
+    document.getElementById('costo').value = '';
+    document.getElementById('precioVenta').value = '';
+    document.getElementById('cantidad').value = '1';
+
+  } catch (error) {
+    mostrarAlerta("❌ Error al guardar: " + error.message, "danger");
+  } finally {
+    btnAgregar.textContent = btnOriginalText;
+    btnAgregar.disabled = false;
+  }
 }
-</script>
 
+// Función para cargar el inventario
+async function cargarInventario() {
+  const contenedor = document.getElementById("inventarioContenido");
+  contenedor.innerHTML = '<p>Cargando inventario...</p>';
+
+  if (!supabase) {
+    contenedor.innerHTML = '<p class="alert alert-danger">Error: Conexión no inicializada</p>';
+    return;
+  }
+
+  try {
+    const { data: productos, error } = await supabase
+      .from("productos")
+      .select("*")
+      .order("categoria", { ascending: true });
+
+    if (error) throw error;
+
+    if (!productos || productos.length === 0) {
+      contenedor.innerHTML = "<p>No hay productos registrados</p>";
+      return;
+    }
+
+    productos.sort((a, b) => a.categoria.localeCompare(b.categoria));
+
+    let html = '';
+    let categoriaActual = '';
+
+    productos.forEach((producto, index) => {
+      if (producto.categoria !== categoriaActual) {
+        categoriaActual = producto.categoria;
+        html += `<div class="categoria-header">${categoriaActual}</div>`;
+        html += `<table>
+                  <thead>
+                    <tr>
+                      <th>Código</th>
+                      <th>Nombre</th>
+                      <th>Descripción</th>
+                      <th>Talla</th>
+                      <th>Costo</th>
+                      <th>Precio</th>
+                      <th>Stock</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>`;
+      }
+
+      const claseCantidad = producto.cantidad <= 5 ? 'cantidad-bajo' : 'cantidad-normal';
+      const textoCantidad = producto.cantidad <= 5 ? `${producto.cantidad} (BAJO)` : producto.cantidad;
+
+      html += `<tr class="producto-row">
+                <td>${producto.codigo}</td>
+                <td>${producto.nombre}</td>
+                <td>${producto.descripcion}</td>
+                <td>${producto.talla}</td>
+                <td>$${producto.costo.toFixed(2)}</td>
+                <td>$${producto.precio_venta.toFixed(2)}</td>
+                <td class="${claseCantidad}">${textoCantidad}</td>
+                <td class='acciones'>
+                  <button onclick="modificarCantidad('${producto.codigo}', 1)" class="success">+1</button>
+                  <button onclick="modificarCantidad('${producto.codigo}', -1)" class="warning">-1</button>
+                  <button onclick="eliminarProducto('${producto.codigo}')" class="danger">Eliminar</button>
+                </td>
+              </tr>`;
+
+      const siguienteProducto = productos[index + 1];
+      if (!siguienteProducto || siguienteProducto.categoria !== categoriaActual) {
+        html += `</tbody></table>`;
+      }
+    });
+
+    contenedor.innerHTML = html;
+  } catch (error) {
+    contenedor.innerHTML = `<p class="alert alert-danger">Error al cargar: ${error.message}</p>`;
+  }
+}
 
 // Función para modificar cantidad
-function modificarCantidad(index, delta) {
-  const nuevaCantidad = Math.max(0, productos[index].cantidad + delta);
-  
-  if (nuevaCantidad === 0 && !confirm("¿Está seguro que desea reducir la cantidad a cero?")) {
+async function modificarCantidad(codigo, delta) {
+  if (!supabase) {
+    mostrarAlerta("Error: Conexión no inicializada", "danger");
     return;
   }
-  
-  productos[index].cantidad = nuevaCantidad;
-  localStorage.setItem("productos", JSON.stringify(productos));
-  cargarInventario();
-  
-  mostrarAlerta(
-    `Cantidad de ${productos[index].nombre} actualizada a ${nuevaCantidad}`,
-    nuevaCantidad <= 5 ? "warning" : "success"
-  );
+
+  try {
+    const { data: productoData, error } = await supabase
+      .from("productos")
+      .select("*")
+      .eq("codigo", codigo)
+      .single();
+
+    if (error || !productoData) {
+      mostrarAlerta("❌ Producto no encontrado", "danger");
+      return;
+    }
+
+    const nuevaCantidad = Math.max(0, productoData.cantidad + delta);
+    
+    if (nuevaCantidad === 0 && !confirm("¿Está seguro que desea reducir la cantidad a cero?")) {
+      return;
+    }
+    
+    const { error: updateError } = await supabase
+      .from("productos")
+      .update({ cantidad: nuevaCantidad })
+      .eq("codigo", codigo);
+
+    if (updateError) throw updateError;
+
+    mostrarAlerta(`✅ Cantidad actualizada a ${nuevaCantidad}`, "success");
+  } catch (error) {
+    mostrarAlerta(`❌ Error al actualizar: ${error.message}`, "danger");
+  }
 }
 
 // Función para eliminar producto
-function eliminarProducto(index) {
-  if (confirm(`¿Está seguro que desea eliminar completamente "${productos[index].nombre}" del inventario?`)) {
-    const productoEliminado = productos.splice(index, 1)[0];
-    localStorage.setItem("productos", JSON.stringify(productos));
-    cargarInventario();
-    
-    mostrarAlerta(
-      `Producto "${productoEliminado.nombre}" eliminado del inventario`,
-      "danger"
-    );
+async function eliminarProducto(codigo) {
+  if (!confirm(`¿Está seguro que desea eliminar este producto?`)) return;
+
+  if (!supabase) {
+    mostrarAlerta("Error: Conexión no inicializada", "danger");
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from("productos")
+      .delete()
+      .eq("codigo", codigo);
+
+    if (error) throw error;
+
+    mostrarAlerta("✅ Producto eliminado", "success");
+  } catch (error) {
+    mostrarAlerta(`❌ Error al eliminar: ${error.message}`, "danger");
   }
 }
 
 // Función para filtrar productos
-function filtrarProductos() {
+async function filtrarProductos() {
   const busqueda = document.getElementById("buscarProducto").value.toLowerCase();
-  const productosFiltrados = productos.filter(p => 
-    p.codigo.toLowerCase().includes(busqueda) || 
-    p.nombre.toLowerCase().includes(busqueda) ||
-    p.categoria.toLowerCase().includes(busqueda)
-  );
-  
   const contenedor = document.getElementById("inventarioContenido");
-  
-  if (productosFiltrados.length === 0) {
-    contenedor.innerHTML = "<p>No se encontraron productos que coincidan con la búsqueda.</p>";
+  contenedor.innerHTML = '<p>Buscando productos...</p>';
+
+  if (!supabase) {
+    contenedor.innerHTML = '<p class="alert alert-danger">Error: Conexión no inicializada</p>';
     return;
   }
-  
-  let html = `<table>
-                <thead>
-                  <tr>
-                    <th>Código</th>
-                    <th>Nombre</th>
-                    <th>Categoría</th>
-                    <th>Talla</th>
-                    <th>Costo</th>
-                    <th>Precio</th>
-                    <th>Stock</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>`;
-  
-  productosFiltrados.forEach((producto, index) => {
-    const indexOriginal = productos.findIndex(p => p.codigo === producto.codigo);
-    const claseCantidad = producto.cantidad <= 5 ? 'cantidad-bajo' : 'cantidad-normal';
-    const textoCantidad = producto.cantidad <= 5 ? `${producto.cantidad} (BAJO)` : producto.cantidad;
+
+  try {
+    const { data: productos, error } = await supabase
+      .from("productos")
+      .select("*")
+      .or(`codigo.ilike.%${busqueda}%,nombre.ilike.%${busqueda}%,categoria.ilike.%${busqueda}%`);
+
+    if (error) throw error;
+
+    if (!productos || productos.length === 0) {
+      contenedor.innerHTML = "<p>No se encontraron productos</p>";
+      return;
+    }
     
-    html += `<tr class="producto-row">
-              <td>${producto.codigo}</td>
-              <td>${producto.nombre}</td>
-              <td>${producto.categoria}</td>
-              <td>${producto.talla}</td>
-              <td>$${producto.costo.toFixed(2)}</td>
-              <td>$${producto.precioVenta.toFixed(2)}</td>
-              <td class="${claseCantidad}">${textoCantidad}</td>
-              <td class='acciones'>
-                <button onclick="modificarCantidad(${indexOriginal}, 1)" class="success">+1</button>
-                <button onclick="modificarCantidad(${indexOriginal}, -1)" class="warning">-1</button>
-                <button onclick="eliminarProducto(${indexOriginal})" class="danger">Eliminar</button>
-              </td>
-            </tr>`;
-  });
-  
-  html += `</tbody></table>`;
-  contenedor.innerHTML = html;
+    let html = `<table>
+                  <thead>
+                    <tr>
+                      <th>Código</th>
+                      <th>Nombre</th>
+                      <th>Descripción</th>
+                      <th>Talla</th>
+                      <th>Costo</th>
+                      <th>Precio</th>
+                      <th>Stock</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>`;
+    
+    productos.forEach((producto) => {
+      const claseCantidad = producto.cantidad <= 5 ? 'cantidad-bajo' : 'cantidad-normal';
+      const textoCantidad = producto.cantidad <= 5 ? `${producto.cantidad} (BAJO)` : producto.cantidad;
+      
+      html += `<tr class="producto-row">
+                <td>${producto.codigo}</td>
+                <td>${producto.nombre}</td>
+                <td>${producto.descripcion}</td>
+                <td>${producto.talla}</td>
+                <td>$${producto.costo.toFixed(2)}</td>
+                <td>$${producto.precio_venta.toFixed(2)}</td>
+                <td class="${claseCantidad}">${textoCantidad}</td>
+                <td class='acciones'>
+                  <button onclick="modificarCantidad('${producto.codigo}', 1)" class="success">+1</button>
+                  <button onclick="modificarCantidad('${producto.codigo}', -1)" class="warning">-1</button>
+                  <button onclick="eliminarProducto('${producto.codigo}')" class="danger">Eliminar</button>
+                </td>
+              </tr>`;
+    });
+    
+    html += `</tbody></table>`;
+    contenedor.innerHTML = html;
+  } catch (error) {
+    contenedor.innerHTML = `<p class="alert alert-danger">Error al buscar: ${error.message}</p>`;
+  }
 }
 
 // Función para confirmar venta
-<script>
 async function confirmarVenta() {
+  const btnVender = document.querySelector('#vender button');
+  const btnOriginalText = btnVender.textContent;
+  btnVender.innerHTML = '<span class="loading"></span> Procesando...';
+  btnVender.disabled = true;
+
+  if (!supabase) {
+    mostrarAlerta("Error: Conexión no inicializada", "danger");
+    btnVender.textContent = btnOriginalText;
+    btnVender.disabled = false;
+    return;
+  }
+
   const codigo = document.getElementById("codigoVenta").value.trim();
   const precio = parseFloat(document.getElementById("precioVentaManual").value);
   const forma_pago = document.getElementById("formaPago").value;
   const fecha = new Date().toISOString().split("T")[0];
   const hora = new Date().toLocaleTimeString();
 
-  if (!codigo || isNaN(precio) || precio <= 0) {
-    mostrarAlerta("Por favor ingrese un código válido y un precio mayor a cero", "danger");
-    return;
+  try {
+    if (!codigo || isNaN(precio) || precio <= 0) {
+      throw new Error("Ingrese un código válido y precio mayor a cero");
+    }
+
+    const { data: productos, error: errorBuscar } = await supabase
+      .from("productos")
+      .select("*")
+      .eq("codigo", codigo);
+
+    if (errorBuscar) throw errorBuscar;
+    if (!productos || productos.length === 0) throw new Error("Producto no encontrado");
+
+    const producto = productos[0];
+
+    if (producto.cantidad <= 0) {
+      throw new Error("No hay suficiente stock");
+    }
+
+    const { error: errorVenta } = await supabase.from("ventas").insert([{
+      codigo,
+      nombre: producto.nombre,
+      descripcion: producto.descripcion,
+      categoria: producto.categoria,
+      talla: producto.talla,
+      cantidad: 1,
+      costo: producto.costo,
+      precio_venta: precio,
+      forma_pago,
+      fecha,
+      hora
+    }]);
+
+    if (errorVenta) throw errorVenta;
+
+    const { error: errorStock } = await supabase
+      .from("productos")
+      .update({ cantidad: producto.cantidad - 1 })
+      .eq("codigo", codigo);
+
+    if (errorStock) throw errorStock;
+
+    mostrarAlerta("✅ Venta registrada", "success");
+    document.getElementById("codigoVenta").value = '';
+    document.getElementById("precioVentaManual").value = '';
+    document.getElementById("codigoVenta").focus();
+  } catch (error) {
+    mostrarAlerta(`❌ Error: ${error.message}`, "danger");
+  } finally {
+    btnVender.textContent = btnOriginalText;
+    btnVender.disabled = false;
   }
-
-  // Buscar producto en Supabase
-  const { data: productos, error: errorBuscar } = await supabase
-    .from("productos")
-    .select("*")
-    .eq("codigo", codigo);
-
-  if (errorBuscar || !productos || productos.length === 0) {
-    mostrarAlerta("❌ Producto no encontrado en Supabase", "danger");
-    return;
-  }
-
-  const producto = productos[0];
-
-  if (producto.cantidad <= 0) {
-    mostrarAlerta("No hay suficiente stock para este producto", "danger");
-    return;
-  }
-
-  // Insertar venta en Supabase
-  const { error: errorVenta } = await supabase.from("ventas").insert([{
-    codigo,
-    descripcion: producto.descripcion,
-    categoria: producto.categoria,
-    talla: producto.talla,
-    cantidad: 1,
-    precio_venta: precio,
-    forma_pago,
-    fecha,
-    hora
-  }]);
-
-  // Actualizar stock
-  const { error: errorStock } = await supabase
-    .from("productos")
-    .update({ cantidad: producto.cantidad - 1 })
-    .eq("codigo", codigo);
-
-  if (errorVenta || errorStock) {
-    mostrarAlerta("❌ E
+}
 
 // Función para mostrar historial
-// Función para mostrar historial desde Supabase
 async function mostrarHistorial() {
   const ano = parseInt(document.getElementById("filtroAno").value) || null;
   const mes = parseInt(document.getElementById("filtroMes").value) || null;
   const dia = parseInt(document.getElementById("filtroDia").value) || null;
   const contenedor = document.getElementById("listaHistorial");
+  contenedor.innerHTML = '<p>Cargando historial...</p>';
 
-  const { data: ventas, error } = await supabase.from("ventas").select("*");
-
-  if (error || !ventas) {
-    contenedor.innerHTML = "<p>❌ Error al cargar ventas desde Supabase.</p>";
+  if (!supabase) {
+    contenedor.innerHTML = '<p class="alert alert-danger">Error: Conexión no inicializada</p>';
     return;
   }
 
-  const ventasFiltradas = ventas.filter(v => {
-    const fecha = new Date(v.fecha);
-    return (!ano || fecha.getFullYear() === ano) &&
-           (!mes || (fecha.getMonth() + 1) === mes) &&
-           (!dia || fecha.getDate() === dia);
-  }).reverse(); // Mostrar las más recientes primero
+  try {
+    const { data: ventas, error } = await supabase.from("ventas").select("*");
 
-  if (ventasFiltradas.length === 0) {
-    contenedor.innerHTML = "<p>No hay ventas registradas para los filtros seleccionados.</p>";
-    return;
+    if (error) throw error;
+
+    const ventasFiltradas = ventas.filter(v => {
+      const fecha = new Date(v.fecha);
+      return (!ano || fecha.getFullYear() === ano) &&
+             (!mes || (fecha.getMonth() + 1) === mes) &&
+             (!dia || fecha.getDate() === dia);
+    }).reverse();
+
+    if (ventasFiltradas.length === 0) {
+      contenedor.innerHTML = "<p>No hay ventas registradas</p>";
+      return;
+    }
+
+    let totalVentas = 0;
+    let totalGanancias = 0;
+    let totalVentasEfectivo = 0;
+    let totalVentasTarjeta = 0;
+    let totalVentasTransferencia = 0;
+
+    let html = `<table>
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Código</th>
+                      <th>Descripción</th>
+                      <th>Categoría</th>
+                      <th>Precio</th>
+                      <th>Ganancia</th>
+                      <th>Pago</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>`;
+
+    ventasFiltradas.forEach(v => {
+      const fecha = new Date(v.fecha);
+      const ganancia = v.precio_venta - (v.costo || 0);
+      totalVentas += v.precio_venta;
+      totalGanancias += ganancia;
+
+      if (v.forma_pago === "Efectivo") totalVentasEfectivo += v.precio_venta;
+      else if (v.forma_pago === "Tarjeta") totalVentasTarjeta += v.precio_venta;
+      else if (v.forma_pago === "Transferencia") totalVentasTransferencia += v.precio_venta;
+
+      html += `<tr>
+                <td>${fecha.toLocaleString()}</td>
+                <td>${v.codigo}</td>
+                <td>${v.descripcion}</td>
+                <td>${v.categoria}</td>
+                <td>$${v.precio_venta.toFixed(2)}</td>
+                <td>$${ganancia.toFixed(2)}</td>
+                <td>${v.forma_pago}</td>
+                <td><button onclick="eliminarVenta('${v.id}')" class="danger">Eliminar</button></td>
+              </tr>`;
+    });
+
+    html += `</tbody></table>`;
+
+    html += `<div class="summary-card">
+              <h3>Resumen de Ventas</h3>
+              <div class="summary-item"><span>Total Ventas:</span><strong>$${totalVentas.toFixed(2)}</strong></div>
+              <div class="summary-item"><span>Total Ganancias:</span><strong>$${totalGanancias.toFixed(2)}</strong></div>
+              <div class="summary-item"><span>Cantidad de Ventas:</span><strong>${ventasFiltradas.length}</strong></div>
+              <div class="summary-item"><span>Ventas en Efectivo:</span><strong>$${totalVentasEfectivo.toFixed(2)}</strong></div>
+              <div class="summary-item"><span>Ventas con Tarjeta:</span><strong>$${totalVentasTarjeta.toFixed(2)}</strong></div>
+              <div class="summary-item"><span>Ventas por Transferencia:</span><strong>$${totalVentasTransferencia.toFixed(2)}</strong></div>
+            </div>`;
+
+    contenedor.innerHTML = html;
+  } catch (error) {
+    contenedor.innerHTML = `<p class="alert alert-danger">Error al cargar: ${error.message}</p>`;
   }
-
-  let totalVentas = 0;
-  let totalGanancias = 0;
-  let totalVentasEfectivo = 0;
-  let totalVentasTarjeta = 0;
-  let totalVentasTransferencia = 0;
-
-  let html = `<table>
-                <thead>
-                  <tr>
-                    <th>Fecha</th>
-                    <th>Código</th>
-                    <th>Descripción</th>
-                    <th>Categoría</th>
-                    <th>Precio</th>
-                    <th>Ganancia</th>
-                    <th>Pago</th>
-                    <th>Acción</th>
-                  </tr>
-                </thead>
-                <tbody>`;
-
-  ventasFiltradas.forEach(v => {
-    const fecha = new Date(v.fecha);
-    const ganancia = v.precio_venta - (v.costo || 0);
-    totalVentas += v.precio_venta;
-    totalGanancias += ganancia;
-
-    if (v.forma_pago === "Efectivo") totalVentasEfectivo += v.precio_venta;
-    else if (v.forma_pago === "Tarjeta") totalVentasTarjeta += v.precio_venta;
-    else if (v.forma_pago === "Transferencia") totalVentasTransferencia += v.precio_venta;
-
-    html += `<tr>
-              <td>${fecha.toLocaleString()}</td>
-              <td>${v.codigo}</td>
-              <td>${v.descripcion}</td>
-              <td>${v.categoria}</td>
-              <td>$${v.precio_venta.toFixed(2)}</td>
-              <td>$${ganancia.toFixed(2)}</td>
-              <td>${v.forma_pago}</td>
-              <td><button onclick="eliminarVenta('${v.id}')" class="danger">Eliminar</button></td>
-            </tr>`;
-  });
-
-  html += `</tbody></table>`;
-
-  html += `<div class="summary-card">
-            <h3>Resumen de Ventas</h3>
-            <div class="summary-item"><span>Total Ventas:</span><strong>$${totalVentas.toFixed(2)}</strong></div>
-            <div class="summary-item"><span>Total Ganancias:</span><strong>$${totalGanancias.toFixed(2)}</strong></div>
-            <div class="summary-item"><span>Cantidad de Ventas:</span><strong>${ventasFiltradas.length}</strong></div>
-            <div class="summary-item"><span>Ventas en Efectivo:</span><strong>$${totalVentasEfectivo.toFixed(2)}</strong></div>
-            <div class="summary-item"><span>Ventas con Tarjeta:</span><strong>$${totalVentasTarjeta.toFixed(2)}</strong></div>
-            <div class="summary-item"><span>Ventas por Transferencia:</span><strong>$${totalVentasTransferencia.toFixed(2)}</strong></div>
-          </div>`;
-
-  contenedor.innerHTML = html;
 }
 
-// Función para eliminar venta desde Supabase
+// Función para eliminar venta
 async function eliminarVenta(id) {
-  if (!confirm("¿Está seguro que desea eliminar esta venta del historial?")) return;
+  if (!confirm("¿Está seguro que desea eliminar esta venta?")) return;
 
-  const { error } = await supabase.from("ventas").delete().eq("id", id);
+  if (!supabase) {
+    mostrarAlerta("Error: Conexión no inicializada", "danger");
+    return;
+  }
 
-  if (error) {
-    mostrarAlerta("❌ Error al eliminar la venta: " + error.message, "danger");
-  } else {
-    mostrarAlerta("✅ Venta eliminada correctamente", "success");
+  try {
+    const { error } = await supabase.from("ventas").delete().eq("id", id);
+    if (error) throw error;
+    
+    mostrarAlerta("✅ Venta eliminada", "success");
     mostrarHistorial();
+  } catch (error) {
+    mostrarAlerta(`❌ Error al eliminar: ${error.message}`, "danger");
   }
 }
 
-// Función para exportar historial a CSV
-// Función para exportar historial desde Supabase a CSV
+// Función para exportar historial
 async function exportarHistorial() {
+  const btnExportar = document.querySelector('#historial button');
+  const btnOriginalText = btnExportar.textContent;
+  btnExportar.innerHTML = '<span class="loading"></span> Exportando...';
+  btnExportar.disabled = true;
+
+  if (!supabase) {
+    mostrarAlerta("Error: Conexión no inicializada", "danger");
+    btnExportar.textContent = btnOriginalText;
+    btnExportar.disabled = false;
+    return;
+  }
+
   const ano = parseInt(document.getElementById("filtroAno").value);
   const mes = parseInt(document.getElementById("filtroMes").value);
   const dia = parseInt(document.getElementById("filtroDia").value);
 
-  let { data: ventas, error } = await supabase.from("ventas").select("*");
+  try {
+    let { data: ventas, error } = await supabase.from("ventas").select("*");
 
-  if (error || !ventas) {
-    mostrarAlerta("❌ Error al obtener ventas desde Supabase", "danger");
-    return;
+    if (error) throw error;
+
+    const ventasFiltradas = ventas.filter(v => {
+      const fecha = new Date(v.fecha);
+      return (!ano || fecha.getFullYear() === ano) &&
+             (!mes || (fecha.getMonth() + 1) === mes) &&
+             (!dia || fecha.getDate() === dia);
+    });
+
+    if (ventasFiltradas.length === 0) {
+      throw new Error("No hay ventas para exportar");
+    }
+
+    let csv = "Fecha,Hora,Código,Nombre,Descripción,Categoría,Talla,Cantidad,Costo,Precio Venta,Ganancia,Forma de Pago\n";
+    
+    ventasFiltradas.forEach(v => {
+      const fecha = new Date(v.fecha).toLocaleDateString();
+      const ganancia = v.precio_venta - (v.costo || 0);
+      csv += `"${fecha}","${v.hora}","${v.codigo}","${v.nombre}","${v.descripcion}","${v.categoria}","${v.talla}",` +
+             `"1","${v.costo.toFixed(2)}","${v.precio_venta.toFixed(2)}","${ganancia.toFixed(2)}","${v.forma_pago}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `historial_ventas_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    mostrarAlerta("✅ Exportación completada", "success");
+  } catch (error) {
+    mostrarAlerta(`❌ Error al exportar: ${error.message}`, "danger");
+  } finally {
+    btnExportar.textContent = btnOriginalText;
+    btnExportar.disabled = false;
   }
-
-  const ventasFiltradas = ventas.filter(v => {
-    const fecha = new Date(v.fecha);
-    return (!ano || fecha.getFullYear() === ano) &&
-           (!mes || (fecha.getMonth() + 1) === mes) &&
-           (!dia || fecha.getDate() === dia);
-  });
-
-  if (ventasFiltradas.length === 0) {
-    mostrarAlerta("No hay ventas para exportar con los filtros actuales", "warning");
-    return;
-  }
-
-  let csv = "Fecha,Código,Descripción,Categoría,Talla,Precio Venta,Forma de Pago\n";
-  
-  ventasFiltradas.forEach(v => {
-    const fecha = new Date(v.fecha).toLocaleString();
-    csv += `"${fecha}","${v.codigo}","${v.descripcion}","${v.categoria}","${v.talla}",` +
-           `"${v.precio_venta.toFixed(2)}","${v.forma_pago}"\n`;
-  });
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', `historial_ventas_${new Date().toISOString().slice(0,10)}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  mostrarAlerta("✅ Historial exportado correctamente desde Supabase", "success");
 }
 
 // Función para cargar filtros de historial
@@ -883,7 +1048,7 @@ function cargarFiltrosHistorial() {
   const selMes = document.getElementById("filtroMes");
   const selDia = document.getElementById("filtroDia");
 
-  // Años (desde 2020 hasta el año actual + 5)
+  // Años
   selAno.innerHTML = '<option value="">Todos los años</option>';
   const anoActual = new Date().getFullYear();
   for (let y = 2020; y <= anoActual + 5; y++) {
@@ -915,11 +1080,9 @@ function showTab(tabName) {
   document.querySelector(`.tab[onclick="showTab('${tabName}')"]`).classList.add('active');
   
   if (tabName === 'inventario') {
-    productos = JSON.parse(localStorage.getItem("productos")) || [];
     cargarInventario();
   }
   if (tabName === 'historial') {
-  
     cargarFiltrosHistorial();
     mostrarHistorial();
   }
@@ -927,109 +1090,12 @@ function showTab(tabName) {
 
 // Inicialización al cargar la página
 window.onload = function() {
-  // Cargar datos del localStorage
-  productos = JSON.parse(localStorage.getItem("productos")) || [];
+  // Inicializar Supabase primero
+  inicializarSupabase();
   
-  
-  // Mostrar la pestaña activa
+  // Luego el resto de la lógica
   showTab('agregar');
-  
-  // Cargar algunos datos de ejemplo si el inventario está vacío (solo para demostración)
-  if (productos.length === 0 && localStorage.getItem("datosEjemplo") === null) {
-    if (confirm("¿Desea cargar datos de ejemplo para probar el sistema?")) {
-      productos = [
-        {
-          codigo: "ROPA001",
-          nombre: "Camiseta básica",
-          categoria: "Ropa",
-          descripcion: "Camiseta de algodón 100%",
-          talla: "M",
-          costo: 8.50,
-          precioVenta: 15.99,
-          cantidad: 25,
-          fechaRegistro: new Date().toISOString()
-        },
-        {
-          codigo: "CALZ001",
-          nombre: "Zapatos deportivos",
-          categoria: "Calzado",
-          descripcion: "Zapatos para correr",
-          talla: "42",
-          costo: 35.00,
-          precioVenta: 59.99,
-          cantidad: 10,
-          fechaRegistro: new Date().toISOString()
-        },
-        {
-          codigo: "ACC001",
-          nombre: "Reloj pulsera",
-          categoria: "Accesorios",
-          descripcion: "Reloj analógico resistente al agua",
-          talla: "Único",
-          costo: 12.00,
-          precioVenta: 24.99,
-          cantidad: 8,
-          fechaRegistro: new Date().toISOString()
-        },
-        {
-          codigo: "ROPA002",
-          nombre: "Pantalón jeans",
-          categoria: "Ropa",
-          descripcion: "Pantalón de mezclilla azul",
-          talla: "32",
-          costo: 15.00,
-          precioVenta: 29.99,
-          cantidad: 15,
-          fechaRegistro: new Date().toISOString()
-        },
-        {
-          codigo: "ELEC001",
-          nombre: "Auriculares inalámbricos",
-          categoria: "Electrónica",
-          descripcion: "Auriculares Bluetooth con cancelación de ruido",
-          talla: "Único",
-          costo: 45.00,
-          precioVenta: 89.99,
-          cantidad: 5,
-          fechaRegistro: new Date().toISOString()
-        }
-      ];
-      
-      localStorage.setItem("productos", JSON.stringify(productos));
-      localStorage.setItem("datosEjemplo", "true");
-      
-      mostrarAlerta("Datos de ejemplo cargados correctamente", "success");
-      cargarInventario();
-    }
-  }
 };
-</script>
-  <!-- SDK Firebase (versión 10.0.0 estable) -->
-<script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
-
-<script>
-  // Configuración EXACTA de tu proyecto (usa tus valores)
-  const firebaseConfig = {
-    apiKey: "AIzaSyDngbbkOzEL.gQLtPSphCH1p133MLNWZw",  // Corrige "spikey" por "apiKey"
-    authDomain: "inventario-65292.firebaseapp.com",
-    projectId: "inventario-65292",                     // ¡Este es el campo más importante!
-    storageBucket: "inventario-65292.appspot.com",     // Corrige "firebasestorage.app"
-    messagingSenderId: "3391729588385",                // Corrige "messagingSearchInfo"
-    appId: "1:3391729588385:web:671552cfb33bf5ba97b59"
-  };
-
-  // Inicializa Firebase
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore(); // Listo para usar Firestore
-
-  // Función de prueba (opcional)
-  function guardarEjemplo() {
-    db.collection("productos").add({
-      nombre: "Producto de prueba",
-      precio: 9.99
-    }).then(() => alert("¡Firestore funciona!"));
-  }
 </script>
 </body>
 </html>
