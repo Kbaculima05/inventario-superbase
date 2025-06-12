@@ -832,12 +832,20 @@ async function eliminarVenta(id) {
 }
 
 // Función para exportar historial a CSV
-function exportarHistorial() {
-  const ano = document.getElementById("filtroAno").value ? parseInt(document.getElementById("filtroAno").value) : null;
-  const mes = document.getElementById("filtroMes").value ? parseInt(document.getElementById("filtroMes").value) : null;
-  const dia = document.getElementById("filtroDia").value ? parseInt(document.getElementById("filtroDia").value) : null;
+// Función para exportar historial desde Supabase a CSV
+async function exportarHistorial() {
+  const ano = parseInt(document.getElementById("filtroAno").value);
+  const mes = parseInt(document.getElementById("filtroMes").value);
+  const dia = parseInt(document.getElementById("filtroDia").value);
 
-  const ventasFiltradas = historialVentas.filter(v => {
+  let { data: ventas, error } = await supabase.from("ventas").select("*");
+
+  if (error || !ventas) {
+    mostrarAlerta("❌ Error al obtener ventas desde Supabase", "danger");
+    return;
+  }
+
+  const ventasFiltradas = ventas.filter(v => {
     const fecha = new Date(v.fecha);
     return (!ano || fecha.getFullYear() === ano) &&
            (!mes || (fecha.getMonth() + 1) === mes) &&
@@ -849,14 +857,12 @@ function exportarHistorial() {
     return;
   }
 
-  let csv = "Fecha,Código,Nombre,Categoría,Precio,Ganancia,Forma de Pago\n";
+  let csv = "Fecha,Código,Descripción,Categoría,Talla,Precio Venta,Forma de Pago\n";
   
-  ventasFiltradas.forEach(venta => {
-    const fecha = new Date(venta.fecha);
-    const ganancia = venta.precio - (venta.costo || 0);
-    
-    csv += `"${fecha.toLocaleString()}","${venta.codigo}","${venta.nombre}","${venta.categoria}",` +
-           `"${venta.precio.toFixed(2)}","${ganancia.toFixed(2)}","${venta.pago}"\n`;
+  ventasFiltradas.forEach(v => {
+    const fecha = new Date(v.fecha).toLocaleString();
+    csv += `"${fecha}","${v.codigo}","${v.descripcion}","${v.categoria}","${v.talla}",` +
+           `"${v.precio_venta.toFixed(2)}","${v.forma_pago}"\n`;
   });
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -867,8 +873,8 @@ function exportarHistorial() {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  
-  mostrarAlerta("Historial exportado correctamente", "success");
+
+  mostrarAlerta("✅ Historial exportado correctamente desde Supabase", "success");
 }
 
 // Función para cargar filtros de historial
