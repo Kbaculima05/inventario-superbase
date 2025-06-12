@@ -470,7 +470,7 @@ let subscription;
 function inicializarsupabaseClient() {
   try {
 const { createClient } = supabase;
-const supabaseClientClient = createClient(
+const supabaseClient = createClient(
   'https://fyhfrxxpvuebrrzmyahe.supabaseClient.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5aGZyeHhwdnVlYnJyem15YWhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk2ODAwNzIsImV4cCI6MjA2NTI1NjA3Mn0.1uMOueVkRrLuz6PJY_M_blsEq83XoU88EdKOKW8Jsm8'
 );
