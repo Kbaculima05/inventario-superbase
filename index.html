@@ -458,25 +458,25 @@
 </main>
 
 <!-- Scripts al final del body para asegurar carga correcta -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabaseClientClient/supabaseClient-js@2"></script>
 <script>
 // Variables globales
 
 let subscription;
 
-// Función para inicializar Supabase
-function inicializarSupabase() {
+// Función para inicializar supabaseClient
+function inicializarsupabaseClient() {
   try {
-const { createClient } = supabase;
-const supabaseClient = createClient(
-  'https://fyhfrxxpvuebrrzmyahe.supabase.co',
+const { createClient } = supabaseClient;
+const supabaseClientClient = createClient(
+  'https://fyhfrxxpvuebrrzmyahe.supabaseClient.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5aGZyeHhwdnVlYnJyem15YWhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk2ODAwNzIsImV4cCI6MjA2NTI1NjA3Mn0.1uMOueVkRrLuz6PJY_M_blsEq83XoU88EdKOKW8Jsm8'
 );
 
     
     // Configurar suscripción a cambios en tiempo real
     
-  subscription = supabaseClient.channel('cambios-inventario')
+  subscription = supabaseClientClient.channel('cambios-inventario')
 
       .on(
         'postgres_changes',
@@ -489,10 +489,10 @@ const supabaseClient = createClient(
       )
       .subscribe();
     
-    console.log("Supabase inicializado correctamente");
+    console.log("supabaseClient inicializado correctamente");
     return true;
   } catch (error) {
-    console.error("Error al inicializar Supabase:", error);
+    console.error("Error al inicializar supabaseClient:", error);
     return false;
   }
 }
@@ -518,8 +518,8 @@ async function agregarProducto() {
   btnAgregar.innerHTML = '<span class="loading"></span> Guardando...';
   btnAgregar.disabled = true;
 
-  // Verificar que Supabase esté inicializado
-  if (!supabase) {
+  // Verificar que supabaseClient esté inicializado
+  if (!supabaseClient) {
     mostrarAlerta("Error: La conexión con la base de datos no está lista", "danger");
     btnAgregar.textContent = btnOriginalText;
     btnAgregar.disabled = false;
@@ -560,7 +560,7 @@ async function agregarProducto() {
   }
 
   try {
-    const { error } = await supabase.from("productos").insert([{
+    const { error } = await supabaseClient.from("productos").insert([{
       codigo,
       nombre,
       descripcion,
@@ -599,13 +599,13 @@ async function cargarInventario() {
   const contenedor = document.getElementById("inventarioContenido");
   contenedor.innerHTML = '<p>Cargando inventario...</p>';
 
-  if (!supabase) {
+  if (!supabaseClient) {
     contenedor.innerHTML = '<p class="alert alert-danger">Error: Conexión no inicializada</p>';
     return;
   }
 
   try {
-    const { data: productos, error } = await supabase
+    const { data: productos, error } = await supabaseClient
       .from("productos")
       .select("*")
       .order("categoria", { ascending: true });
@@ -674,13 +674,13 @@ async function cargarInventario() {
 
 // Función para modificar cantidad
 async function modificarCantidad(codigo, delta) {
-  if (!supabase) {
+  if (!supabaseClient) {
     mostrarAlerta("Error: Conexión no inicializada", "danger");
     return;
   }
 
   try {
-    const { data: productoData, error } = await supabase
+    const { data: productoData, error } = await supabaseClient
       .from("productos")
       .select("*")
       .eq("codigo", codigo)
@@ -697,7 +697,7 @@ async function modificarCantidad(codigo, delta) {
       return;
     }
     
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseClient
       .from("productos")
       .update({ cantidad: nuevaCantidad })
       .eq("codigo", codigo);
@@ -714,13 +714,13 @@ async function modificarCantidad(codigo, delta) {
 async function eliminarProducto(codigo) {
   if (!confirm(`¿Está seguro que desea eliminar este producto?`)) return;
 
-  if (!supabase) {
+  if (!supabaseClient) {
     mostrarAlerta("Error: Conexión no inicializada", "danger");
     return;
   }
 
   try {
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from("productos")
       .delete()
       .eq("codigo", codigo);
@@ -739,13 +739,13 @@ async function filtrarProductos() {
   const contenedor = document.getElementById("inventarioContenido");
   contenedor.innerHTML = '<p>Buscando productos...</p>';
 
-  if (!supabase) {
+  if (!supabaseClient) {
     contenedor.innerHTML = '<p class="alert alert-danger">Error: Conexión no inicializada</p>';
     return;
   }
 
   try {
-    const { data: productos, error } = await supabase
+    const { data: productos, error } = await supabaseClient
       .from("productos")
       .select("*")
       .or(`codigo.ilike.%${busqueda}%,nombre.ilike.%${busqueda}%,categoria.ilike.%${busqueda}%`);
@@ -806,7 +806,7 @@ async function confirmarVenta() {
   btnVender.innerHTML = '<span class="loading"></span> Procesando...';
   btnVender.disabled = true;
 
-  if (!supabase) {
+  if (!supabaseClient) {
     mostrarAlerta("Error: Conexión no inicializada", "danger");
     btnVender.textContent = btnOriginalText;
     btnVender.disabled = false;
@@ -824,7 +824,7 @@ async function confirmarVenta() {
       throw new Error("Ingrese un código válido y precio mayor a cero");
     }
 
-    const { data: productos, error: errorBuscar } = await supabase
+    const { data: productos, error: errorBuscar } = await supabaseClient
       .from("productos")
       .select("*")
       .eq("codigo", codigo);
@@ -838,7 +838,7 @@ async function confirmarVenta() {
       throw new Error("No hay suficiente stock");
     }
 
-    const { error: errorVenta } = await supabase.from("ventas").insert([{
+    const { error: errorVenta } = await supabaseClient.from("ventas").insert([{
       codigo,
       nombre: producto.nombre,
       descripcion: producto.descripcion,
@@ -854,7 +854,7 @@ async function confirmarVenta() {
 
     if (errorVenta) throw errorVenta;
 
-    const { error: errorStock } = await supabase
+    const { error: errorStock } = await supabaseClient
       .from("productos")
       .update({ cantidad: producto.cantidad - 1 })
       .eq("codigo", codigo);
@@ -881,13 +881,13 @@ async function mostrarHistorial() {
   const contenedor = document.getElementById("listaHistorial");
   contenedor.innerHTML = '<p>Cargando historial...</p>';
 
-  if (!supabase) {
+  if (!supabaseClient) {
     contenedor.innerHTML = '<p class="alert alert-danger">Error: Conexión no inicializada</p>';
     return;
   }
 
   try {
-    const { data: ventas, error } = await supabase.from("ventas").select("*");
+    const { data: ventas, error } = await supabaseClient.from("ventas").select("*");
 
     if (error) throw error;
 
@@ -968,13 +968,13 @@ async function mostrarHistorial() {
 async function eliminarVenta(id) {
   if (!confirm("¿Está seguro que desea eliminar esta venta?")) return;
 
-  if (!supabase) {
+  if (!supabaseClient) {
     mostrarAlerta("Error: Conexión no inicializada", "danger");
     return;
   }
 
   try {
-    const { error } = await supabase.from("ventas").delete().eq("id", id);
+    const { error } = await supabaseClient.from("ventas").delete().eq("id", id);
     if (error) throw error;
     
     mostrarAlerta("✅ Venta eliminada", "success");
@@ -991,7 +991,7 @@ async function exportarHistorial() {
   btnExportar.innerHTML = '<span class="loading"></span> Exportando...';
   btnExportar.disabled = true;
 
-  if (!supabase) {
+  if (!supabaseClient) {
     mostrarAlerta("Error: Conexión no inicializada", "danger");
     btnExportar.textContent = btnOriginalText;
     btnExportar.disabled = false;
@@ -1003,7 +1003,7 @@ async function exportarHistorial() {
   const dia = parseInt(document.getElementById("filtroDia").value);
 
   try {
-    let { data: ventas, error } = await supabase.from("ventas").select("*");
+    let { data: ventas, error } = await supabaseClient.from("ventas").select("*");
 
     if (error) throw error;
 
@@ -1093,8 +1093,8 @@ function showTab(tabName) {
 
 // Inicialización al cargar la página
 window.onload = function() {
-  // Inicializar Supabase primero
-  inicializarSupabase();
+  // Inicializar supabaseClient primero
+  inicializarsupabaseClient();
   
   // Luego el resto de la lógica
   showTab('agregar');
