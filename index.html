@@ -4,6 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sistema de Inventario y Ventas</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const supabase = supabase.createClient(
+    'https://fyhfrxxpvuebrrzmyahe.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5aGZyeHhwdnVlYnJyem15YWhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk2ODAwNzIsImV4cCI6MjA2NTI1NjA3Mn0.1uMOueVkRrLuz6PJY_M_blsEq83XoU88EdKOKW8Jsm8'
+  );
+</script>
+
   <style>
     :root {
       --primary-color: #3498db;
@@ -449,48 +458,51 @@ let productos = JSON.parse(localStorage.getItem("productos")) || [];
 let historialVentas = JSON.parse(localStorage.getItem("historialVentas")) || [];
 
 // Función para agregar producto
-function agregarProducto() {
-  const producto = {
-    codigo: document.getElementById('codigo').value.trim(),
-    nombre: document.getElementById('nombre').value.trim(),
-    categoria: document.getElementById('categoria').value.trim(),
-    descripcion: document.getElementById('descripcion').value.trim(),
-    talla: document.getElementById('talla').value.trim(),
-    costo: parseFloat(document.getElementById('costo').value),
-    precioVenta: parseFloat(document.getElementById('precioVenta').value),
-    cantidad: parseInt(document.getElementById('cantidad').value),
-    fechaRegistro: new Date().toISOString()
-  };
-  
+async function agregarProducto() {
+  const codigo = document.getElementById("codigo").value.trim();
+  const nombre = document.getElementById("nombre").value.trim();
+  const categoria = document.getElementById("categoria").value.trim();
+  const descripcion = document.getElementById("descripcion").value.trim();
+  const talla = document.getElementById("talla").value.trim();
+  const costo = parseFloat(document.getElementById("costo").value);
+  const precioVenta = parseFloat(document.getElementById("precioVenta").value);
+  const cantidad = parseInt(document.getElementById("cantidad").value);
+  const fecha = new Date().toISOString().split("T")[0];
+
   // Validaciones
-  if (!producto.codigo || !producto.nombre || !producto.categoria || 
-      isNaN(producto.costo) || isNaN(producto.precioVenta) || isNaN(producto.cantidad)) {
+  if (!codigo || !nombre || !categoria || isNaN(costo) || isNaN(precioVenta) || isNaN(cantidad)) {
     mostrarAlerta("Por favor complete todos los campos obligatorios", "danger");
     return;
   }
-  
-  if (producto.costo <= 0 || producto.precioVenta <= 0 || producto.cantidad <= 0) {
+
+  if (costo <= 0 || precioVenta <= 0 || cantidad <= 0) {
     mostrarAlerta("Los valores de costo, precio y cantidad deben ser mayores a cero", "danger");
     return;
   }
 
-  if (producto.precioVenta < producto.costo) {
+  if (precioVenta < costo) {
     if (!confirm("El precio de venta es menor que el costo. ¿Desea continuar?")) {
       return;
     }
   }
 
-  const index = productos.findIndex(p => p.codigo === producto.codigo);
-  if (index >= 0) {
-    productos[index].cantidad += producto.cantidad;
-    mostrarAlerta(`Producto actualizado. Nueva cantidad: ${productos[index].cantidad}`, "success");
-  } else {
-    productos.push(producto);
-    mostrarAlerta("Producto agregado correctamente al inventario", "success");
+  const { error } = await supabase.from("productos").insert([{
+    codigo,
+    descripcion: nombre + " - " + descripcion,
+    categoria,
+    talla,
+    costo,
+    cantidad,
+    fecha_ingreso: fecha
+  }]);
+
+  if (error) {
+    mostrarAlerta("❌ Error al guardar en Supabase: " + error.message, "danger");
+    return;
   }
-  
-  localStorage.setItem("productos", JSON.stringify(productos));
-  
+
+  mostrarAlerta("✅ Producto guardado correctamente en Supabase", "success");
+
   // Limpiar formulario
   document.getElementById('codigo').value = '';
   document.getElementById('nombre').value = '';
@@ -500,9 +512,10 @@ function agregarProducto() {
   document.getElementById('costo').value = '';
   document.getElementById('precioVenta').value = '';
   document.getElementById('cantidad').value = '1';
-  
+
   cargarInventario();
 }
+
 
 // Función para mostrar alertas
 function mostrarAlerta(mensaje, tipo) {
@@ -519,21 +532,25 @@ function mostrarAlerta(mensaje, tipo) {
 }
 
 // Función para cargar el inventario categorizado
-function cargarInventario() {
+f<script>
+async function cargarInventario() {
+  const { data: productos, error } = await supabase
+    .from("productos")
+    .select("*")
+    .order("categoria", { ascending: true });
+
   const contenedor = document.getElementById("inventarioContenido");
-  
-  if (productos.length === 0) {
-    contenedor.innerHTML = "<p>No hay productos en el inventario. Agregue algunos productos para comenzar.</p>";
+
+  if (error || !productos || productos.length === 0) {
+    contenedor.innerHTML = "<p>No hay productos cargados desde Supabase.</p>";
     return;
   }
-  
-  // Ordenar productos por categoría
+
   productos.sort((a, b) => a.categoria.localeCompare(b.categoria));
-  
+
   let html = '';
   let categoriaActual = '';
-  
-  // Agrupar por categoría
+
   productos.forEach((producto, index) => {
     if (producto.categoria !== categoriaActual) {
       categoriaActual = producto.categoria;
@@ -542,43 +559,36 @@ function cargarInventario() {
                 <thead>
                   <tr>
                     <th>Código</th>
-                    <th>Nombre</th>
+                    <th>Descripción</th>
                     <th>Talla</th>
                     <th>Costo</th>
-                    <th>Precio</th>
                     <th>Stock</th>
-                    <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>`;
     }
-    
+
     const claseCantidad = producto.cantidad <= 5 ? 'cantidad-bajo' : 'cantidad-normal';
     const textoCantidad = producto.cantidad <= 5 ? `${producto.cantidad} (BAJO)` : producto.cantidad;
-    
+
     html += `<tr class="producto-row">
               <td>${producto.codigo}</td>
-              <td>${producto.nombre}</td>
+              <td>${producto.descripcion}</td>
               <td>${producto.talla}</td>
               <td>$${producto.costo.toFixed(2)}</td>
-              <td>$${producto.precioVenta.toFixed(2)}</td>
               <td class="${claseCantidad}">${textoCantidad}</td>
-              <td class='acciones'>
-                <button onclick="modificarCantidad(${index}, 1)" class="success">+1</button>
-                <button onclick="modificarCantidad(${index}, -1)" class="warning">-1</button>
-                <button onclick="eliminarProducto(${index})" class="danger">Eliminar</button>
-              </td>
             </tr>`;
-    
-    // Cerrar tabla si el siguiente producto es de otra categoría o es el último
+
     const siguienteProducto = productos[index + 1];
     if (!siguienteProducto || siguienteProducto.categoria !== categoriaActual) {
       html += `</tbody></table>`;
     }
   });
-  
+
   contenedor.innerHTML = html;
 }
+</script>
+
 
 // Función para modificar cantidad
 function modificarCantidad(index, delta) {
@@ -669,74 +679,58 @@ function filtrarProductos() {
 }
 
 // Función para confirmar venta
-function confirmarVenta() {
+<script>
+async function confirmarVenta() {
   const codigo = document.getElementById("codigoVenta").value.trim();
   const precio = parseFloat(document.getElementById("precioVentaManual").value);
-  const pago = document.getElementById("formaPago").value;
-  const fecha = new Date().toISOString();
-  
+  const forma_pago = document.getElementById("formaPago").value;
+  const fecha = new Date().toISOString().split("T")[0];
+  const hora = new Date().toLocaleTimeString();
+
   if (!codigo || isNaN(precio) || precio <= 0) {
     mostrarAlerta("Por favor ingrese un código válido y un precio mayor a cero", "danger");
     return;
   }
-  
-  const index = productos.findIndex(p => p.codigo === codigo);
-  
-  if (index >= 0) {
-    if (productos[index].cantidad > 0) {
-      productos[index].cantidad--;
-      localStorage.setItem("productos", JSON.stringify(productos));
-      
-      const venta = { 
-        codigo, 
-        nombre: productos[index].nombre,
-        categoria: productos[index].categoria,
-        precio, 
-        pago, 
-        fecha,
-        costo: productos[index].costo
-      };
-      
-      historialVentas.push(venta);
-      localStorage.setItem("historialVentas", JSON.stringify(historialVentas));
-      
-      mostrarAlerta(
-        `Venta registrada: ${productos[index].nombre} por $${precio.toFixed(2)} (${pago})`,
-        "success"
-      );
-      
-      // Actualizar inventario si está visible
-      if (document.getElementById("inventario").classList.contains("active")) {
-        cargarInventario();
-      }
-    } else {
-      mostrarAlerta("No hay suficiente stock para este producto", "danger");
-    }
-  } else {
-    if (confirm("Producto no encontrado. ¿Desea registrar la venta igualmente?")) {
-      const venta = { 
-        codigo, 
-        nombre: "Producto no registrado",
-        categoria: "Varios",
-        precio, 
-        pago, 
-        fecha,
-        costo: 0
-      };
-      
-      historialVentas.push(venta);
-      localStorage.setItem("historialVentas", JSON.stringify(historialVentas));
-      
-      mostrarAlerta(
-        `Venta registrada (producto no registrado) por $${precio.toFixed(2)} (${pago})`,
-        "warning"
-      );
-    }
+
+  // Buscar producto en Supabase
+  const { data: productos, error: errorBuscar } = await supabase
+    .from("productos")
+    .select("*")
+    .eq("codigo", codigo);
+
+  if (errorBuscar || !productos || productos.length === 0) {
+    mostrarAlerta("❌ Producto no encontrado en Supabase", "danger");
+    return;
   }
-  
-  document.getElementById("codigoVenta").value = "";
-  document.getElementById("precioVentaManual").value = "";
-}
+
+  const producto = productos[0];
+
+  if (producto.cantidad <= 0) {
+    mostrarAlerta("No hay suficiente stock para este producto", "danger");
+    return;
+  }
+
+  // Insertar venta en Supabase
+  const { error: errorVenta } = await supabase.from("ventas").insert([{
+    codigo,
+    descripcion: producto.descripcion,
+    categoria: producto.categoria,
+    talla: producto.talla,
+    cantidad: 1,
+    precio_venta: precio,
+    forma_pago,
+    fecha,
+    hora
+  }]);
+
+  // Actualizar stock
+  const { error: errorStock } = await supabase
+    .from("productos")
+    .update({ cantidad: producto.cantidad - 1 })
+    .eq("codigo", codigo);
+
+  if (errorVenta || errorStock) {
+    mostrarAlerta("❌ E
 
 // Función para mostrar historial
 function mostrarHistorial() {
