@@ -919,7 +919,7 @@ function showTab(tabName) {
     cargarInventario();
   }
   if (tabName === 'historial') {
-    historialVentas = JSON.parse(localStorage.getItem("historialVentas")) || [];
+  
     cargarFiltrosHistorial();
     mostrarHistorial();
   }
