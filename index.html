@@ -1,21 +1,1047 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sistema de Inventario y Ventas</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --primary-color: #3498db;
+      --secondary-color: #2980b9;
+      --danger-color: #e74c3c;
+      --success-color: #2ecc71;
+      --warning-color: #f39c12;
+      --light-color: #ecf0f1;
+      --dark-color: #34495e;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      background-color: #f5f7fa;
+      color: #333;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+    
+    header {
+      background-color: var(--primary-color);
+      color: white;
+      padding: 1.5rem 0;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    header h1 {
+      text-align: center;
+      font-size: 2rem;
+    }
+    
+    .tabs {
+      display: flex;
+      background: var(--dark-color);
+      border-radius: 5px 5px 0 0;
+      overflow: hidden;
+    }
+    
+    .tab {
+      flex: 1;
+      padding: 15px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      color: white;
+      font-weight: bold;
+    }
+    
+    .tab:hover {
+      background-color: var(--secondary-color);
+    }
+    
+    .tab.active {
+      background-color: var(--primary-color);
+    }
+    
+    .tab-content {
+      display: none;
+      padding: 25px;
+      background: white;
+      border-radius: 0 0 5px 5px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+    
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.5s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    h2 {
+      color: var(--primary-color);
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--light-color);
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: var(--dark-color);
+    }
+    
+    input, select, textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+      transition: border 0.3s ease;
+    }
+    
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--primary-color);
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+    }
+    
+    button {
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      transition: all 0.3s ease;
+      width: 100%;
+    }
+    
+    button:hover {
+      background-color: var(--secondary-color);
+      transform: translateY(-2px);
+    }
+    
+    button.secondary {
+      background-color: var(--light-color);
+      color: var(--dark-color);
+    }
+    
+    button.danger {
+      background-color: var(--danger-color);
+    }
+    
+    button.success {
+      background-color: var(--success-color);
+    }
+    
+    button.warning {
+      background-color: var(--warning-color);
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    th, td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+    
+    th {
+      background-color: var(--primary-color);
+      color: white;
+      font-weight: bold;
+    }
+    
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    
+    tr:hover {
+      background-color: #f1f1f1;
+    }
+    
+    .categoria-header {
+      background-color: var(--dark-color);
+      color: white;
+      font-weight: bold;
+      padding: 12px 15px;
+      margin: 25px 0 10px 0;
+      border-radius: 4px;
+    }
+    
+    .cantidad-bajo {
+      color: var(--danger-color);
+      font-weight: bold;
+    }
+    
+    .cantidad-normal {
+      color: var(--success-color);
+    }
+    
+    .search-container {
+      display: flex;
+      margin-bottom: 20px;
+      gap: 10px;
+    }
+    
+    .search-container input {
+      flex: 1;
+    }
+    
+    .search-container button {
+      width: auto;
+      padding: 12px 20px;
+    }
+    
+    .acciones {
+      display: flex;
+      gap: 5px;
+    }
+    
+    .acciones button {
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+    
+    .producto-row:hover {
+      background-color: #e8f4fc !important;
+    }
+    
+    .filter-container {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    
+    .filter-container label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    .filter-container select {
+      width: auto;
+      min-width: 120px;
+    }
+    
+    .summary-card {
+      background: white;
+      border-radius: 5px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .summary-card h3 {
+      color: var(--dark-color);
+      margin-bottom: 15px;
+    }
+    
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .summary-item:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+    
+    .summary-item strong {
+      color: var(--primary-color);
+    }
+    
+    .alert {
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+    }
+    
+    .alert-success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    
+    .alert-danger {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    
+    @media (max-width: 768px) {
+      .tabs {
+        flex-direction: column;
+      }
+      
+      .filter-container {
+        flex-direction: column;
+      }
+      
+      .filter-container select {
+        width: 100%;
+      }
+      
+      .acciones {
+        flex-direction: column;
+      }
+    }
+  </style>
 </head>
 <body>
-  <h1>Sistema de Inventario y Ventas</h1>
-  <p>Este archivo ya está conectado a Supabase y guarda inventario y ventas en la nube.</p>
-  <script>
-    const supabaseUrl = 'https://fyhfrxxpvuebrrzmyahe.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5aGZyeHhwdnVlYnJyem15YWhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk2ODAwNzIsImV4cCI6MjA2NTI1NjA3Mn0.1uMOueVkRrLuz6PJY_M_blsEq83XoU88EdKOKW8Jsm8';
-    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+<header>
+  <div class="container">
+    <h1>Sistema de Inventario y Ventas</h1>
+  </div>
+</header>
 
-    // Aquí iría el resto del código JavaScript del sistema de inventario
-  </script>
+<main class="container">
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('agregar')">Agregar Producto</div>
+    <div class="tab" onclick="showTab('inventario')">Inventario</div>
+    <div class="tab" onclick="showTab('vender')">Vender</div>
+    <div class="tab" onclick="showTab('historial')">Historial</div>
+  </div>
+
+  <div id="agregar" class="tab-content active">
+    <h2>Agregar Nuevo Producto</h2>
+    <div class="form-group">
+      <label for="codigo">Código de barras:</label>
+      <input type="text" id="codigo" placeholder="Ingrese el código de barras">
+    </div>
+    
+    <div class="form-group">
+      <label for="nombre">Nombre del producto:</label>
+      <input type="text" id="nombre" placeholder="Ingrese el nombre del producto">
+    </div>
+    
+    <div class="form-group">
+      <label for="categoria">Categoría:</label>
+      <input type="text" id="categoria" placeholder="Ej: Ropa, Calzado, Electrónica">
+    </div>
+    
+    <div class="form-group">
+      <label for="descripcion">Descripción:</label>
+      <textarea id="descripcion" rows="3" placeholder="Descripción del producto"></textarea>
+    </div>
+    
+    <div class="form-group">
+      <label for="talla">Talla/Medida:</label>
+      <input type="text" id="talla" placeholder="Ej: S, M, L, 38, 40, etc.">
+    </div>
+    
+    <div class="form-group">
+      <label for="costo">Costo:</label>
+      <input type="number" step="0.01" id="costo" placeholder="Costo del producto">
+    </div>
+    
+    <div class="form-group">
+      <label for="precioVenta">Precio de venta:</label>
+      <input type="number" step="0.01" id="precioVenta" placeholder="Precio de venta al público">
+    </div>
+    
+    <div class="form-group">
+      <label for="cantidad">Cantidad:</label>
+      <input type="number" id="cantidad" min="1" value="1" placeholder="Cantidad en stock">
+    </div>
+    
+    <button onclick="agregarProducto()" class="success">Agregar Producto</button>
+  </div>
+
+  <div id="inventario" class="tab-content">
+    <h2>Inventario de Productos</h2>
+    
+    <div class="search-container">
+      <input type="text" id="buscarProducto" placeholder="Buscar por código o nombre...">
+      <button onclick="filtrarProductos()">Buscar</button>
+    </div>
+    
+    <div id="inventarioContenido"></div>
+  </div>
+
+  <div id="vender" class="tab-content">
+    <h2>Registrar Venta</h2>
+    
+    <div class="form-group">
+      <label for="codigoVenta">Código de barras del producto:</label>
+      <input type="text" id="codigoVenta" placeholder="Escanee o ingrese el código">
+    </div>
+    
+    <div class="form-group">
+      <label for="precioVentaManual">Precio de venta:</label>
+      <input type="number" step="0.01" id="precioVentaManual" placeholder="Precio de venta">
+    </div>
+    
+    <div class="form-group">
+      <label for="formaPago">Forma de pago:</label>
+      <select id="formaPago">
+        <option value="Efectivo">Efectivo</option>
+        <option value="Tarjeta">Tarjeta</option>
+        <option value="Transferencia">Transferencia</option>
+        <option value="Otro">Otro</option>
+      </select>
+    </div>
+    
+    <button onclick="confirmarVenta()" class="success">Confirmar Venta</button>
+    
+    <div id="mensajeVenta" style="margin-top: 20px;"></div>
+  </div>
+
+  <div id="historial" class="tab-content">
+    <h2>Historial de Ventas</h2>
+    
+    <div class="filter-container">
+      <label>
+        Año:
+        <select id="filtroAno" onchange="mostrarHistorial()"></select>
+      </label>
+      
+      <label>
+        Mes:
+        <select id="filtroMes" onchange="mostrarHistorial()"></select>
+      </label>
+      
+      <label>
+        Día:
+        <select id="filtroDia" onchange="mostrarHistorial()"></select>
+      </label>
+      
+      <button onclick="exportarHistorial()" class="secondary">Exportar a CSV</button>
+    </div>
+    
+    <div id="listaHistorial"></div>
+  </div>
+</main>
+
+<script>
+// Variables globales
+let productos = JSON.parse(localStorage.getItem("productos")) || [];
+let historialVentas = JSON.parse(localStorage.getItem("historialVentas")) || [];
+
+// Función para agregar producto
+function agregarProducto() {
+  const producto = {
+    codigo: document.getElementById('codigo').value.trim(),
+    nombre: document.getElementById('nombre').value.trim(),
+    categoria: document.getElementById('categoria').value.trim(),
+    descripcion: document.getElementById('descripcion').value.trim(),
+    talla: document.getElementById('talla').value.trim(),
+    costo: parseFloat(document.getElementById('costo').value),
+    precioVenta: parseFloat(document.getElementById('precioVenta').value),
+    cantidad: parseInt(document.getElementById('cantidad').value),
+    fechaRegistro: new Date().toISOString()
+  };
+  
+  // Validaciones
+  if (!producto.codigo || !producto.nombre || !producto.categoria || 
+      isNaN(producto.costo) || isNaN(producto.precioVenta) || isNaN(producto.cantidad)) {
+    mostrarAlerta("Por favor complete todos los campos obligatorios", "danger");
+    return;
+  }
+  
+  if (producto.costo <= 0 || producto.precioVenta <= 0 || producto.cantidad <= 0) {
+    mostrarAlerta("Los valores de costo, precio y cantidad deben ser mayores a cero", "danger");
+    return;
+  }
+
+  if (producto.precioVenta < producto.costo) {
+    if (!confirm("El precio de venta es menor que el costo. ¿Desea continuar?")) {
+      return;
+    }
+  }
+
+  const index = productos.findIndex(p => p.codigo === producto.codigo);
+  if (index >= 0) {
+    productos[index].cantidad += producto.cantidad;
+    mostrarAlerta(`Producto actualizado. Nueva cantidad: ${productos[index].cantidad}`, "success");
+  } else {
+    productos.push(producto);
+    mostrarAlerta("Producto agregado correctamente al inventario", "success");
+  }
+  
+  localStorage.setItem("productos", JSON.stringify(productos));
+  
+  // Limpiar formulario
+  document.getElementById('codigo').value = '';
+  document.getElementById('nombre').value = '';
+  document.getElementById('categoria').value = '';
+  document.getElementById('descripcion').value = '';
+  document.getElementById('talla').value = '';
+  document.getElementById('costo').value = '';
+  document.getElementById('precioVenta').value = '';
+  document.getElementById('cantidad').value = '1';
+  
+  cargarInventario();
+}
+
+// Función para mostrar alertas
+function mostrarAlerta(mensaje, tipo) {
+  const alerta = document.createElement('div');
+  alerta.className = `alert alert-${tipo}`;
+  alerta.textContent = mensaje;
+  
+  const tabContent = document.querySelector('.tab-content.active');
+  tabContent.insertBefore(alerta, tabContent.firstChild);
+  
+  setTimeout(() => {
+    alerta.remove();
+  }, 5000);
+}
+
+// Función para cargar el inventario categorizado
+function cargarInventario() {
+  const contenedor = document.getElementById("inventarioContenido");
+  
+  if (productos.length === 0) {
+    contenedor.innerHTML = "<p>No hay productos en el inventario. Agregue algunos productos para comenzar.</p>";
+    return;
+  }
+  
+  // Ordenar productos por categoría
+  productos.sort((a, b) => a.categoria.localeCompare(b.categoria));
+  
+  let html = '';
+  let categoriaActual = '';
+  
+  // Agrupar por categoría
+  productos.forEach((producto, index) => {
+    if (producto.categoria !== categoriaActual) {
+      categoriaActual = producto.categoria;
+      html += `<div class="categoria-header">${categoriaActual}</div>`;
+      html += `<table>
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Nombre</th>
+                    <th>Talla</th>
+                    <th>Costo</th>
+                    <th>Precio</th>
+                    <th>Stock</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>`;
+    }
+    
+    const claseCantidad = producto.cantidad <= 5 ? 'cantidad-bajo' : 'cantidad-normal';
+    const textoCantidad = producto.cantidad <= 5 ? `${producto.cantidad} (BAJO)` : producto.cantidad;
+    
+    html += `<tr class="producto-row">
+              <td>${producto.codigo}</td>
+              <td>${producto.nombre}</td>
+              <td>${producto.talla}</td>
+              <td>$${producto.costo.toFixed(2)}</td>
+              <td>$${producto.precioVenta.toFixed(2)}</td>
+              <td class="${claseCantidad}">${textoCantidad}</td>
+              <td class='acciones'>
+                <button onclick="modificarCantidad(${index}, 1)" class="success">+1</button>
+                <button onclick="modificarCantidad(${index}, -1)" class="warning">-1</button>
+                <button onclick="eliminarProducto(${index})" class="danger">Eliminar</button>
+              </td>
+            </tr>`;
+    
+    // Cerrar tabla si el siguiente producto es de otra categoría o es el último
+    const siguienteProducto = productos[index + 1];
+    if (!siguienteProducto || siguienteProducto.categoria !== categoriaActual) {
+      html += `</tbody></table>`;
+    }
+  });
+  
+  contenedor.innerHTML = html;
+}
+
+// Función para modificar cantidad
+function modificarCantidad(index, delta) {
+  const nuevaCantidad = Math.max(0, productos[index].cantidad + delta);
+  
+  if (nuevaCantidad === 0 && !confirm("¿Está seguro que desea reducir la cantidad a cero?")) {
+    return;
+  }
+  
+  productos[index].cantidad = nuevaCantidad;
+  localStorage.setItem("productos", JSON.stringify(productos));
+  cargarInventario();
+  
+  mostrarAlerta(
+    `Cantidad de ${productos[index].nombre} actualizada a ${nuevaCantidad}`,
+    nuevaCantidad <= 5 ? "warning" : "success"
+  );
+}
+
+// Función para eliminar producto
+function eliminarProducto(index) {
+  if (confirm(`¿Está seguro que desea eliminar completamente "${productos[index].nombre}" del inventario?`)) {
+    const productoEliminado = productos.splice(index, 1)[0];
+    localStorage.setItem("productos", JSON.stringify(productos));
+    cargarInventario();
+    
+    mostrarAlerta(
+      `Producto "${productoEliminado.nombre}" eliminado del inventario`,
+      "danger"
+    );
+  }
+}
+
+// Función para filtrar productos
+function filtrarProductos() {
+  const busqueda = document.getElementById("buscarProducto").value.toLowerCase();
+  const productosFiltrados = productos.filter(p => 
+    p.codigo.toLowerCase().includes(busqueda) || 
+    p.nombre.toLowerCase().includes(busqueda) ||
+    p.categoria.toLowerCase().includes(busqueda)
+  );
+  
+  const contenedor = document.getElementById("inventarioContenido");
+  
+  if (productosFiltrados.length === 0) {
+    contenedor.innerHTML = "<p>No se encontraron productos que coincidan con la búsqueda.</p>";
+    return;
+  }
+  
+  let html = `<table>
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Nombre</th>
+                    <th>Categoría</th>
+                    <th>Talla</th>
+                    <th>Costo</th>
+                    <th>Precio</th>
+                    <th>Stock</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>`;
+  
+  productosFiltrados.forEach((producto, index) => {
+    const indexOriginal = productos.findIndex(p => p.codigo === producto.codigo);
+    const claseCantidad = producto.cantidad <= 5 ? 'cantidad-bajo' : 'cantidad-normal';
+    const textoCantidad = producto.cantidad <= 5 ? `${producto.cantidad} (BAJO)` : producto.cantidad;
+    
+    html += `<tr class="producto-row">
+              <td>${producto.codigo}</td>
+              <td>${producto.nombre}</td>
+              <td>${producto.categoria}</td>
+              <td>${producto.talla}</td>
+              <td>$${producto.costo.toFixed(2)}</td>
+              <td>$${producto.precioVenta.toFixed(2)}</td>
+              <td class="${claseCantidad}">${textoCantidad}</td>
+              <td class='acciones'>
+                <button onclick="modificarCantidad(${indexOriginal}, 1)" class="success">+1</button>
+                <button onclick="modificarCantidad(${indexOriginal}, -1)" class="warning">-1</button>
+                <button onclick="eliminarProducto(${indexOriginal})" class="danger">Eliminar</button>
+              </td>
+            </tr>`;
+  });
+  
+  html += `</tbody></table>`;
+  contenedor.innerHTML = html;
+}
+
+// Función para confirmar venta
+function confirmarVenta() {
+  const codigo = document.getElementById("codigoVenta").value.trim();
+  const precio = parseFloat(document.getElementById("precioVentaManual").value);
+  const pago = document.getElementById("formaPago").value;
+  const fecha = new Date().toISOString();
+  
+  if (!codigo || isNaN(precio) || precio <= 0) {
+    mostrarAlerta("Por favor ingrese un código válido y un precio mayor a cero", "danger");
+    return;
+  }
+  
+  const index = productos.findIndex(p => p.codigo === codigo);
+  
+  if (index >= 0) {
+    if (productos[index].cantidad > 0) {
+      productos[index].cantidad--;
+      localStorage.setItem("productos", JSON.stringify(productos));
+      
+      const venta = { 
+        codigo, 
+        nombre: productos[index].nombre,
+        categoria: productos[index].categoria,
+        precio, 
+        pago, 
+        fecha,
+        costo: productos[index].costo
+      };
+      
+      historialVentas.push(venta);
+      localStorage.setItem("historialVentas", JSON.stringify(historialVentas));
+      
+      mostrarAlerta(
+        `Venta registrada: ${productos[index].nombre} por $${precio.toFixed(2)} (${pago})`,
+        "success"
+      );
+      
+      // Actualizar inventario si está visible
+      if (document.getElementById("inventario").classList.contains("active")) {
+        cargarInventario();
+      }
+    } else {
+      mostrarAlerta("No hay suficiente stock para este producto", "danger");
+    }
+  } else {
+    if (confirm("Producto no encontrado. ¿Desea registrar la venta igualmente?")) {
+      const venta = { 
+        codigo, 
+        nombre: "Producto no registrado",
+        categoria: "Varios",
+        precio, 
+        pago, 
+        fecha,
+        costo: 0
+      };
+      
+      historialVentas.push(venta);
+      localStorage.setItem("historialVentas", JSON.stringify(historialVentas));
+      
+      mostrarAlerta(
+        `Venta registrada (producto no registrado) por $${precio.toFixed(2)} (${pago})`,
+        "warning"
+      );
+    }
+  }
+  
+  document.getElementById("codigoVenta").value = "";
+  document.getElementById("precioVentaManual").value = "";
+}
+
+// Función para mostrar historial
+function mostrarHistorial() {
+  const ano = document.getElementById("filtroAno").value ? parseInt(document.getElementById("filtroAno").value) : null;
+  const mes = document.getElementById("filtroMes").value ? parseInt(document.getElementById("filtroMes").value) : null;
+  const dia = document.getElementById("filtroDia").value ? parseInt(document.getElementById("filtroDia").value) : null;
+  const contenedor = document.getElementById("listaHistorial");
+
+  const ventasFiltradas = historialVentas.filter(v => {
+    const fecha = new Date(v.fecha);
+    return (!ano || fecha.getFullYear() === ano) &&
+           (!mes || (fecha.getMonth() + 1) === mes) &&
+           (!dia || fecha.getDate() === dia);
+  }).reverse(); // Mostrar las más recientes primero
+
+  if (ventasFiltradas.length === 0) {
+    contenedor.innerHTML = "<p>No hay ventas registradas para los filtros seleccionados.</p>";
+    return;
+  }
+  
+  let totalVentas = 0;
+  let totalGanancias = 0;
+  let totalVentasEfectivo = 0;
+  let totalVentasTarjeta = 0;
+  let totalVentasTransferencia = 0;
+  
+  let html = `<table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Código</th>
+                    <th>Nombre</th>
+                    <th>Categoría</th>
+                    <th>Precio</th>
+                    <th>Ganancia</th>
+                    <th>Pago</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>`;
+  
+  ventasFiltradas.forEach((venta, index) => {
+    const fecha = new Date(venta.fecha);
+    const ganancia = venta.precio - (venta.costo || 0);
+    totalVentas += venta.precio;
+    totalGanancias += ganancia;
+    
+    // Contar por forma de pago
+    if (venta.pago === "Efectivo") totalVentasEfectivo += venta.precio;
+    else if (venta.pago === "Tarjeta") totalVentasTarjeta += venta.precio;
+    else if (venta.pago === "Transferencia") totalVentasTransferencia += venta.precio;
+    
+    html += `<tr>
+              <td>${fecha.toLocaleString()}</td>
+              <td>${venta.codigo}</td>
+              <td>${venta.nombre}</td>
+              <td>${venta.categoria}</td>
+              <td>$${venta.precio.toFixed(2)}</td>
+              <td>$${ganancia.toFixed(2)}</td>
+              <td>${venta.pago}</td>
+              <td><button onclick="eliminarVenta(${historialVentas.indexOf(venta)})" class="danger">Eliminar</button></td>
+            </tr>`;
+  });
+  
+  html += `</tbody></table>`;
+  
+  // Resumen de ventas
+  html += `<div class="summary-card">
+            <h3>Resumen de Ventas</h3>
+            <div class="summary-item">
+              <span>Total Ventas:</span>
+              <strong>$${totalVentas.toFixed(2)}</strong>
+            </div>
+            <div class="summary-item">
+              <span>Total Ganancias:</span>
+              <strong>$${totalGanancias.toFixed(2)}</strong>
+            </div>
+            <div class="summary-item">
+              <span>Cantidad de Ventas:</span>
+              <strong>${ventasFiltradas.length}</strong>
+            </div>
+            <div class="summary-item">
+              <span>Ventas en Efectivo:</span>
+              <strong>$${totalVentasEfectivo.toFixed(2)}</strong>
+            </div>
+            <div class="summary-item">
+              <span>Ventas con Tarjeta:</span>
+              <strong>$${totalVentasTarjeta.toFixed(2)}</strong>
+            </div>
+            <div class="summary-item">
+              <span>Ventas por Transferencia:</span>
+              <strong>$${totalVentasTransferencia.toFixed(2)}</strong>
+            </div>
+          </div>`;
+  
+  contenedor.innerHTML = html;
+}
+
+// Función para eliminar venta del historial
+function eliminarVenta(index) {
+  if (confirm("¿Está seguro que desea eliminar esta venta del historial?")) {
+    const ventaEliminada = historialVentas.splice(index, 1)[0];
+    localStorage.setItem("historialVentas", JSON.stringify(historialVentas));
+    mostrarHistorial();
+    
+    mostrarAlerta(
+      `Venta eliminada del historial: ${ventaEliminada.nombre} por $${ventaEliminada.precio.toFixed(2)}`,
+      "danger"
+    );
+  }
+}
+
+// Función para exportar historial a CSV
+function exportarHistorial() {
+  const ano = document.getElementById("filtroAno").value ? parseInt(document.getElementById("filtroAno").value) : null;
+  const mes = document.getElementById("filtroMes").value ? parseInt(document.getElementById("filtroMes").value) : null;
+  const dia = document.getElementById("filtroDia").value ? parseInt(document.getElementById("filtroDia").value) : null;
+
+  const ventasFiltradas = historialVentas.filter(v => {
+    const fecha = new Date(v.fecha);
+    return (!ano || fecha.getFullYear() === ano) &&
+           (!mes || (fecha.getMonth() + 1) === mes) &&
+           (!dia || fecha.getDate() === dia);
+  });
+
+  if (ventasFiltradas.length === 0) {
+    mostrarAlerta("No hay ventas para exportar con los filtros actuales", "warning");
+    return;
+  }
+
+  let csv = "Fecha,Código,Nombre,Categoría,Precio,Ganancia,Forma de Pago\n";
+  
+  ventasFiltradas.forEach(venta => {
+    const fecha = new Date(venta.fecha);
+    const ganancia = venta.precio - (venta.costo || 0);
+    
+    csv += `"${fecha.toLocaleString()}","${venta.codigo}","${venta.nombre}","${venta.categoria}",` +
+           `"${venta.precio.toFixed(2)}","${ganancia.toFixed(2)}","${venta.pago}"\n`;
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `historial_ventas_${new Date().toISOString().slice(0,10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  mostrarAlerta("Historial exportado correctamente", "success");
+}
+
+// Función para cargar filtros de historial
+function cargarFiltrosHistorial() {
+  const selAno = document.getElementById("filtroAno");
+  const selMes = document.getElementById("filtroMes");
+  const selDia = document.getElementById("filtroDia");
+
+  // Años (desde 2020 hasta el año actual + 5)
+  selAno.innerHTML = '<option value="">Todos los años</option>';
+  const anoActual = new Date().getFullYear();
+  for (let y = 2020; y <= anoActual + 5; y++) {
+    selAno.innerHTML += `<option value="${y}">${y}</option>`;
+  }
+  selAno.value = anoActual;
+
+  // Meses
+  const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+  selMes.innerHTML = '<option value="">Todos los meses</option>';
+  meses.forEach((mes, index) => {
+    selMes.innerHTML += `<option value="${index + 1}">${mes}</option>`;
+  });
+  selMes.value = new Date().getMonth() + 1;
+
+  // Días
+  selDia.innerHTML = '<option value="">Todos los días</option>';
+  for (let d = 1; d <= 31; d++) {
+    selDia.innerHTML += `<option value="${d}">${d}</option>`;
+  }
+  selDia.value = new Date().getDate();
+}
+
+// Función para cambiar pestañas
+function showTab(tabName) {
+  document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+  document.getElementById(tabName).classList.add('active');
+  document.querySelector(`.tab[onclick="showTab('${tabName}')"]`).classList.add('active');
+  
+  if (tabName === 'inventario') {
+    productos = JSON.parse(localStorage.getItem("productos")) || [];
+    cargarInventario();
+  }
+  if (tabName === 'historial') {
+    historialVentas = JSON.parse(localStorage.getItem("historialVentas")) || [];
+    cargarFiltrosHistorial();
+    mostrarHistorial();
+  }
+}
+
+// Inicialización al cargar la página
+window.onload = function() {
+  // Cargar datos del localStorage
+  productos = JSON.parse(localStorage.getItem("productos")) || [];
+  historialVentas = JSON.parse(localStorage.getItem("historialVentas")) || [];
+  
+  // Mostrar la pestaña activa
+  showTab('agregar');
+  
+  // Cargar algunos datos de ejemplo si el inventario está vacío (solo para demostración)
+  if (productos.length === 0 && localStorage.getItem("datosEjemplo") === null) {
+    if (confirm("¿Desea cargar datos de ejemplo para probar el sistema?")) {
+      productos = [
+        {
+          codigo: "ROPA001",
+          nombre: "Camiseta básica",
+          categoria: "Ropa",
+          descripcion: "Camiseta de algodón 100%",
+          talla: "M",
+          costo: 8.50,
+          precioVenta: 15.99,
+          cantidad: 25,
+          fechaRegistro: new Date().toISOString()
+        },
+        {
+          codigo: "CALZ001",
+          nombre: "Zapatos deportivos",
+          categoria: "Calzado",
+          descripcion: "Zapatos para correr",
+          talla: "42",
+          costo: 35.00,
+          precioVenta: 59.99,
+          cantidad: 10,
+          fechaRegistro: new Date().toISOString()
+        },
+        {
+          codigo: "ACC001",
+          nombre: "Reloj pulsera",
+          categoria: "Accesorios",
+          descripcion: "Reloj analógico resistente al agua",
+          talla: "Único",
+          costo: 12.00,
+          precioVenta: 24.99,
+          cantidad: 8,
+          fechaRegistro: new Date().toISOString()
+        },
+        {
+          codigo: "ROPA002",
+          nombre: "Pantalón jeans",
+          categoria: "Ropa",
+          descripcion: "Pantalón de mezclilla azul",
+          talla: "32",
+          costo: 15.00,
+          precioVenta: 29.99,
+          cantidad: 15,
+          fechaRegistro: new Date().toISOString()
+        },
+        {
+          codigo: "ELEC001",
+          nombre: "Auriculares inalámbricos",
+          categoria: "Electrónica",
+          descripcion: "Auriculares Bluetooth con cancelación de ruido",
+          talla: "Único",
+          costo: 45.00,
+          precioVenta: 89.99,
+          cantidad: 5,
+          fechaRegistro: new Date().toISOString()
+        }
+      ];
+      
+      localStorage.setItem("productos", JSON.stringify(productos));
+      localStorage.setItem("datosEjemplo", "true");
+      
+      mostrarAlerta("Datos de ejemplo cargados correctamente", "success");
+      cargarInventario();
+    }
+  }
+};
+</script>
+  <!-- SDK Firebase (versión 10.0.0 estable) -->
+<script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
+
+<script>
+  // Configuración EXACTA de tu proyecto (usa tus valores)
+  const firebaseConfig = {
+    apiKey: "AIzaSyDngbbkOzEL.gQLtPSphCH1p133MLNWZw",  // Corrige "spikey" por "apiKey"
+    authDomain: "inventario-65292.firebaseapp.com",
+    projectId: "inventario-65292",                     // ¡Este es el campo más importante!
+    storageBucket: "inventario-65292.appspot.com",     // Corrige "firebasestorage.app"
+    messagingSenderId: "3391729588385",                // Corrige "messagingSearchInfo"
+    appId: "1:3391729588385:web:671552cfb33bf5ba97b59"
+  };
+
+  // Inicializa Firebase
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore(); // Listo para usar Firestore
+
+  // Función de prueba (opcional)
+  function guardarEjemplo() {
+    db.collection("productos").add({
+      nombre: "Producto de prueba",
+      precio: 9.99
+    }).then(() => alert("¡Firestore funciona!"));
+  }
+</script>
 </body>
 </html>
