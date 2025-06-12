@@ -461,20 +461,23 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // Variables globales
-let supabase;
+
 let subscription;
 
 // Función para inicializar Supabase
 function inicializarSupabase() {
   try {
-    supabase = supabase.createClient(
-      'https://fyhfrxxpvuebrrzmyahe.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5aGZyeHhwdnVlYnJyem15YWhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk2ODAwNzIsImV4cCI6MjA2NTI1NjA3Mn0.1uMOueVkRrLuz6PJY_M_blsEq83XoU88EdKOKW8Jsm8'
-    );
+const { createClient } = supabase;
+const supabaseClient = createClient(
+  'https://fyhfrxxpvuebrrzmyahe.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5aGZyeHhwdnVlYnJyem15YWhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk2ODAwNzIsImV4cCI6MjA2NTI1NjA3Mn0.1uMOueVkRrLuz6PJY_M_blsEq83XoU88EdKOKW8Jsm8'
+);
+
     
     // Configurar suscripción a cambios en tiempo real
-    subscription = supabase
-      .channel('cambios-inventario')
+    
+  subscription = supabaseClient.channel('cambios-inventario')
+
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'productos' },
