@@ -878,9 +878,10 @@ async function confirmarVenta() {
 
 // Función para mostrar historial
 async function mostrarHistorial() {
-  const ano = parseInt(document.getElementById("filtroAno").value) || null;
-  const mes = parseInt(document.getElementById("filtroMes").value) || null;
-  const dia = parseInt(document.getElementById("filtroDia").value) || null;
+  const ano = document.getElementById("filtroAno").value;
+  const mes = document.getElementById("filtroMes").value;
+  const dia = document.getElementById("filtroDia").value;
+
   const contenedor = document.getElementById("listaHistorial");
   contenedor.innerHTML = '<p>Cargando historial...</p>';
 
@@ -896,9 +897,10 @@ async function mostrarHistorial() {
 
     const ventasFiltradas = ventas.filter(v => {
       const fecha = new Date(v.fecha);
-      return (!ano || fecha.getFullYear() === ano) &&
-             (!mes || (fecha.getMonth() + 1) === mes) &&
-             (!dia || fecha.getDate() === dia);
+      return (!ano || fecha.getFullYear() == ano) &&
+             (!mes || (fecha.getMonth() + 1) == mes) &&
+             (!dia || fecha.getDate() == dia);
+
     }).reverse();
 
     if (ventasFiltradas.length === 0) {
