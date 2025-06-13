@@ -478,7 +478,7 @@ const supabaseClient = createClient(
     
     // Configurar suscripción a cambios en tiempo real
     
-  subscription = supabaseClientClient.channel('cambios-inventario')
+  subscription = supabaseClient.channel('cambios-inventario')
 
       .on(
         'postgres_changes',
