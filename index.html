@@ -537,7 +537,7 @@ async function agregarProducto() {
   const costo = parseFloat(document.getElementById("costo").value);
   const precioVenta = parseFloat(document.getElementById("precioVenta").value);
   const cantidad = parseInt(document.getElementById("cantidad").value);
-  const fecha = new Date().toISOString().split("T")[0];
+  const fecha = new Date().toISOString();  // Guarda como timestamp real
 
   // Validaciones
   if (!codigo || !nombre || !categoria || isNaN(costo) || isNaN(precioVenta) || isNaN(cantidad)) {
@@ -819,7 +819,7 @@ async function confirmarVenta() {
   const codigo = document.getElementById("codigoVenta").value.trim();
   const precio = parseFloat(document.getElementById("precioVentaManual").value);
   const forma_pago = document.getElementById("formaPago").value;
-  const fecha = new Date().toISOString().split("T")[0];
+  const fecha = new Date().toISOString();  // Guarda como timestamp real
   const hora = new Date().toLocaleTimeString();
 
   try {
